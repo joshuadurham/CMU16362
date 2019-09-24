@@ -25,7 +25,7 @@ initLeftEncoder = robot.encoders.LatestMessage.Vector.X;
 initRightEncoder = robot.encoders.LatestMessage.Vector.Y;
 
 % ADJUST THESE HERE
-useFeedback = false;
+useFeedback = true;
 timeDelay = 0.2;
 kp = 3;
 ki = 0.0;
@@ -116,8 +116,7 @@ title('error of robot position against ideal trajectory versus time');
 xlabel('time (s)');
 ylabel('error (m)');
 plot(tArr(1:count-1), errArr(1:count-1));
-ylim([-0.006, 0.006]);
-xlim([0,6]);
+ylim([-0.006, 0.006])
 function uref = trapezoidalVelocityProfile(t, amax, vmax, dist, sgn)
     tRamp = vmax / amax;
     tF = (dist + (vmax*vmax)/amax)/vmax;
