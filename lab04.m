@@ -17,16 +17,19 @@ prevRightEncoder = 0;
 x = 0;
 y = 0;
 theta = 0;
-robot = raspbot('sim');
+% robot = raspbot('sim');
+% other robot
+robot = raspbot('RaspBot-19');
+pause(3);
 positionIdx = 1;
 robot.encoders.NewMessageFcn=@encoderEventListener;
 initLeftEncoder = robot.encoders.LatestMessage.Vector.X;
 initRightEncoder = robot.encoders.LatestMessage.Vector.Y;
 
 % ADJUST THESE HERE
-useFeedback = true;
-timeDelay = 0;
-kp = 1;
+useFeedback = false;
+timeDelay = 0.4;
+kp = 0.5;
 ki = 0;
 kd = 0;
 
@@ -40,33 +43,46 @@ feedForward = 0;
 currIdealPos = 0;
 currT = 0;
 prevT = 0;
-error = currIdealPos - x;
+
 feedForward = 0;
 delayedFeedForward = 0;
 currIdealPos = 0;
 delayedCurrIdealPos = 0;
 firstIteration = false;
+scaleFactor = 1;
 
-while(abs(goalPosition - x) > 0.0001)
+% Graphing setup
+len = 10000;
+idealArr = zeros(1, len);
+realArr = zeros(1, len);
+errArr = zeros(1, len);
+tArr = zeros(1, len);
+vArr = zeros(1, len);
+
+myplot = plot(errArr, tArr, 'b-');
+count = 1;
+realX = x;
+error = currIdealPos - realX;
+while((abs(goalPosition - realX) > 0.001))
     if(firstIteration == false)
         startTic = tic();        
         firstIteration = true;
     end
     currT = toc(startTic);
     deltaT = currT - prevT;
-    currIdealPos = currIdealPos + feedForward * deltaT
+    currIdealPos = currIdealPos + feedForward * deltaT;
     if (feedForward == 0 && currT > 3) 
-        currIdealPos = goalPosition;
+       currIdealPos = goalPosition;
     end
     delayedCurrIdealPos = delayedCurrIdealPos + delayedFeedForward * deltaT;
-    error = currIdealPos - x;
+    error = currIdealPos - realX;
     errorDelta = (error - prevError)/deltaT;
     accError = accError + error*deltaT;
     cmd = kp*error + ki*accError + kd*errorDelta;
     if (cmd > 0.3)
         cmd = 0.3;
     end
-    feedForward = trapezoidalVelocityProfile(currT, amax, vmax, goalPosition, 1);
+    feedForward = trapezoidalVelocityProfile(currT, amax, vmax, goalPosition, 1) * scaleFactor;
     delayedFeedForward = trapezoidalVelocityProfile(currT - timeDelay, amax, vmax, goalPosition, 1);
     if (useFeedback) 
         robot.sendVelocity(cmd + feedForward, cmd + feedForward);
@@ -75,10 +91,43 @@ while(abs(goalPosition - x) > 0.0001)
     end
     prevT = currT;
     prevError = error;
-    pause(0.05);
+%     plot
+%     set(myplot, 'xdata', [get(myplot, 'xdata') currT], 'ydata', [get(myplot, 'ydata') currIdealPos])
+%     set(myplot, 'xdata', [get(myplot, 'xdata') currT], 'ydata', [get(myplot, 'ydata') currIdealPos])
+    idealArr(count) = currIdealPos;
+    realArr(count) = realX;
+    tArr(count) = currT;
+    vArr(count) = feedForward;
+    count = count + 1;
+    realX = x;
+    if(currT >= 18)
+        break;
+    end
+    pause(0.01);
 end
+
+% while(currT < 5)
+%     if(firstIteration == false)
+%         startTic = tic();    
+%         firstIteration = true;
+%     end
+%     currT = toc(startTic);
+%     feedForward = trapezoidalVelocityProfile(currT, amax, vmax, goalPosition, 1) * scaleFactor;
+%     robot.sendVelocity(feedForward, feedForward);
+%     tArr(count) = currT;
+%     vArr(count) = feedForward;
+%     count = count + 1;
+% end
+
 robot.stop();
 robot.shutdown();
+clf;
+hold on;
+plot(tArr(1:count-1), realArr(1:count-1));
+plot(tArr(1:count-1), idealArr(1:count-1));
+plot(tArr(1:count-1), vArr(1:count-1));
+
+legend('real x', 'ideal x', 'velocity');
 
 function uref = trapezoidalVelocityProfile(t, amax, vmax, dist, sgn)
     tRamp = vmax / amax;
