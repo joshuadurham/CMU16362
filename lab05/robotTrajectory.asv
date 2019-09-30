@@ -11,50 +11,55 @@ classdef robotTrajectory
        length
        startx
        starty
+       startth
+       starts
     end
     
     methods
-        function obj = robotTrajectory(ref, startx, starty, numSamples)
+        function obj = robotTrajectory(ref, startx, starty, startth, starts, numSamples, startTime, endTime)
             %UNTITLED Construct an instance of this class
             %   Detailed explanation goes here
             obj.ref = ref;
             obj.startx = startx;
             obj.starty = starty;
+            obj.startth = startth;
+            obj.starts = starts;
         
-            obj.tSamples = linspace(0, obj.ref.Tf, numSamples);
+            obj.tSamples = linspace(startTime, endTime, numSamples);
             obj.length = size(obj.tSamples, 2);
             
             obj.poseSamples = zeros(3, obj.length);
-            obj.vlSamples = zeros(obj.length);
-            obj.vrSamples = zeros(obj.length);
+            obj.vlSamples = zeros(1, obj.length);
+            obj.vrSamples = zeros(1, obj.length);
             
-            slast = 0; % maybe need a starting pose
-            tlast = 0;
+            slast = obj.starts; % maybe need a starting pose
+            tlast = startTime;
             count = 1;
             
             x = obj.startx;
             y = obj.starty;
-            th = 0;
+            th = obj.startth;
             
             for i=1:obj.length
-                t = obj.tSamples(i) / (obj.ref.ks / obj.ref.kv);
-                if ((t < obj.ref.tPause) || (t > obj.ref.tPause + obj.ref.Tf))
-                    vl = 0;
-                    vr = 0;
-                    s = 0;
-                else
-                    [v, w] = obj.ref.computeControl(t);
-                    
-                    s = v .* ((t - obj.ref.tPause) / (obj.ref.ks / obj.ref.kv));
-                    ds = s - slast;
-                    dt = t - tlast;
+                t = obj.tSamples(i);
+                T = t * obj.ref.ks / obj.ref.kv;
+%                 if ((T < obj.ref.tPause) || (T > obj.ref.tPause + obj.ref.Tf))
+%                     vl = 0;
+%                     vr = 0;
+%                     s = slast;
+%                 else
+                [v, w] = obj.ref.computeControl(t);
+                dt = t - tlast;
+                s = v .* dt + slast;
+                % s = v .* (t - obj.ref.tPause / (obj.ref.ks / obj.ref.kv));
+                ds = s - slast;
 
-                    [vl, vr] = robotModel.VwTovlvr(v, w);
+                [vl, vr] = robotModel.VwTovlvr(v, w);
 
-                    th = th + obj.ref.ks * w ./ 2 * dt;
-                    x = x + obj.ref.ks * ds * cos(th);
-                    y = y + obj.ref.ks * ds * sin(th);
-                    th = th + obj.ref.ks * w ./ 2 * dt;
+                th = th + obj.ref.ks * w ./ 2 * dt;
+                x = x + obj.ref.ks * ds * cos(th);
+                y = y + obj.ref.ks * ds * sin(th);
+                th = th + obj.ref.ks * w ./ 2 * dt;
                 end
                 
                 pose = [x; y; th];
@@ -70,7 +75,7 @@ classdef robotTrajectory
             end
         end
         
-        function [vl, vr] = getVlVrArT(obj, t)
+        function [vl, vr] = getVlVrAtT(obj, t)
             vl = interp1(obj.tSamples, obj.vlSamples, t);
             vr = interp1(obj.tSamples, obj.vrSamples, t);
         end
