@@ -74,7 +74,7 @@ classdef trapezoidalReferenceControl
                     firstIteration = true;
                 end
                 currT = toc(startTic);
-                deltaT = currT - prevT;
+                ta
                 currIdealPos = currIdealPos + feedForward * deltaT;
                 delayedCurrIdealPos = delayedCurrIdealPos + delayedFeedForward * deltaT;
                 % error = delayedCurrIdealPos - realX;

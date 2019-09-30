@@ -63,11 +63,13 @@ classdef figure8
                     vr = 0;
                     s = 0;
                 else
-                    v = obj.vel;
+%                   v = obj.vel;
+                    [v, w] = obj.computeControl(t);
                     s = v .* (t - obj.tPause / (obj.ks / obj.kv));
                     ds = s - slast;
-                    k = (obj.kk ./ obj.ks) * sin(obj.kth * s);
-                    w = k .* v;
+%                     k = (obj.kk ./ obj.ks) * sin(obj.kth * s);
+%                     w = k .* v;
+                    
 
                     [vl, vr] = robotModel.VwTovlvr(v, w);
 
@@ -76,6 +78,7 @@ classdef figure8
                     y = y + obj.ks * ds * sin(th);
                     th = th + obj.ks * w ./ 2 * dt;
                 end
+                
                 % update arrays
                 obj.vlArr(count) = vl;
                 obj.vrArr(count) = vr;
@@ -107,19 +110,19 @@ classdef figure8
 %                 w = 0;
 %                 return
 %             end
-            v = obj.vel;
+            V = obj.vel;
             t = timeNow - (obj.Tdelay / (obj.ks / obj.kv));
-            s = v .* (t - obj.tPause / (obj.ks / obj.kv));
+            s = V .* (t - obj.tPause / (obj.ks / obj.kv));
             k = (obj.kk ./ obj.ks) * sin(obj.kth * s);
-            w = k .* v;
+            V = V * obj.kv;
+            w = k .* V;
 %             [~, ind] = min(abs(obj.tArr - timeNow));
 %             velL = obj.vlArr(ind);
 %             velR = obj.vrArr(ind);
-            V = obj.vel; 
         end
         
         function duration = getTrajectoryDuration(obj)
-            duration = obj.tPause * 2 + obj.tf;
+            duration = obj.tPause * 2 + obj.Tf;
         end
     end
 end

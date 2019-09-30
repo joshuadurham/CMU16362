@@ -8,6 +8,8 @@ classdef robotTrajectory
        vlSamples
        vrSamples
        tSamples
+       wSamples
+       VSamples
        length
        startx
        starty
@@ -31,6 +33,8 @@ classdef robotTrajectory
             obj.poseSamples = zeros(3, obj.length);
             obj.vlSamples = zeros(1, obj.length);
             obj.vrSamples = zeros(1, obj.length);
+            obj.VSamples = zeros(1, obj.length);
+            obj.wSamples = zeros(1, obj.length);
             
             slast = obj.starts; % maybe need a starting pose
             tlast = startTime;
@@ -46,6 +50,8 @@ classdef robotTrajectory
                 if ((T < obj.ref.tPause) || (T > obj.ref.tPause + obj.ref.Tf))
                     vl = 0;
                     vr = 0;
+                    v = 0;
+                    w = 0;
                     s = slast;
                 else
                     [v, w] = obj.ref.computeControl(t);
@@ -67,6 +73,8 @@ classdef robotTrajectory
                 obj.vrSamples(count) = vr;
                 obj.poseSamples(:, count) = pose;
                 obj.tSamples(count) = t;
+                obj.wSamples(count) = w;
+                obj.VSamples(count) = v;
 
                 % Update for next iter
                 count = count + 1;
@@ -79,9 +87,19 @@ classdef robotTrajectory
             vl = interp1(obj.tSamples, obj.vlSamples, t);
             vr = interp1(obj.tSamples, obj.vrSamples, t);
         end
+        
+        function [V, w] = getVwAtT(obj, t)
+            V = interp1(obj.tSamples, obj.VSamples, t);
+            w = interp1(obj.tSamples, obj.wSamples, t);
+        end
             
-        function pose = getPoseAtT(obj,t)
-            pose = interp1(obj.tSamples, obj.vlSamples, t);
+        function [xval, yval, thval] = getPoseAtT(obj,t)
+            x = obj.poseSamples(1, :);
+            y = obj.poseSamples(2, :);
+            th = obj.poseSamples(3, :);
+            xval = interp1(obj.tSamples, x, t);
+            yval = interp1(obj.tSamples, y, t);
+            thval = interp1(obj.tSamples, th, t);
         end
         
     end

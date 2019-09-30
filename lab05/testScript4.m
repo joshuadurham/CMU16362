@@ -18,7 +18,7 @@ while(currT < 6)
     currT = toc(startTic);
     [vl, vr] = f.getVlVrAtT(currT);
     vla(count) = vl;
-    vlr(count) = vr;
+    vra(count) = vr;
     count = count + 1;
     robot.sendVelocity(vl, vr);
     pause(0.05);
