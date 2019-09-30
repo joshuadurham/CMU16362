@@ -20,6 +20,7 @@ classdef figure8
         ks
         kv
         tPause
+        Tf
     end
         
     methods
@@ -37,6 +38,7 @@ classdef figure8
             obj.vlArr = zeros(obj.length);
             obj.vrArr = zeros(obj.length);
             obj.tArr = zeros(obj.length);
+            obj.Tf = (Ks / Kv) * obj.tf;
 
             count = 1;
             x = 0;
@@ -47,10 +49,10 @@ classdef figure8
             slast = 0;
             T = 0;
 
-            Tf = (Ks / Kv) * obj.tf;
+            
             first = true;
 
-            while(T < Tf + 2 * obj.tPause)
+            while(T < obj.Tf + 2 * obj.tPause)
                 if(first)
                     startTic = tic();        
                     first = false;
@@ -58,13 +60,13 @@ classdef figure8
                 T = toc(startTic) - obj.Tdelay;
                 t = T / (obj.ks / obj.kv);
                 dt = t - tlast;
-                if ((T <= obj.tPause) || (T >= Tf + obj.tPause))
+                if ((T <= obj.tPause) || (T >= obj.Tf + obj.tPause))
                     vl = 0;
                     vr = 0;
                     s = 0;
                 else
                     v = obj.vel;
-                    s = v .* (t - obj. ;
+                    s = v .* (t - obj.tPause / (obj.ks / obj.kv));
                     ds = s - slast;
                     k = (obj.kk ./ obj.ks) * sin(obj.kth * s);
                     w = k .* v;
@@ -102,10 +104,20 @@ classdef figure8
         end
         
         function [V, w] = computeControl(obj, timeNow)
-            [~, ind] = min(abs(obj.tArr - timeNow));
-            velL = obj.vlArr(ind);
-            velR = obj.vrArr(ind);
-            [V, w]= robotModel.vlvrToVw(velL, velR); 
+            if ((timeNow <= obj.tPause) || (timeNow >= obj.Tf + obj.tPause))
+                V = 0;
+                w = 0;
+                return
+            end
+            v = obj.vel;
+            t = (timeNow - obj.Tdelay - obj.tPause) / (obj.ks/obj.kv);
+            s = v .* t;
+            k = (obj.kk ./ obj.ks) * sin(obj.kth * s);
+            w = k .* v;
+%             [~, ind] = min(abs(obj.tArr - timeNow));
+%             velL = obj.vlArr(ind);
+%             velR = obj.vrArr(ind);
+            V = obj.vel; 
         end
         
         function duration = getTrajectoryDuration(obj)
