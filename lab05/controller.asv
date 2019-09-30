@@ -5,17 +5,26 @@ classdef controller
     properties
        refPose
        acPose
+       Vref
     end
     
     methods
-        function obj = controller(refPose,acPose)
+        function obj = controller(refPose,acPose,Vref)
             %UNTITLED Construct an instance of this class
             %   Detailed explanation goes here
             obj.refPose = refPose;
             obj.acPose = acPose;
+            obj.Vref = Vref;
+            obj.invTwr = acPose.aToB();
+            obj.diff = refPose.getPoseVec() - acPose.getPoseVec();
+            obj.rrp = invTwr*refPose;
+            obj.tau = 0.6;
+            obj.kx = 1/tau;
+            obj.ky = 2/()
+            
         end
         
-        function [vl, vr] = error(obj, t)
+        function [V, omega] = error(obj)
             vl = interp1(obj.tSamples, obj.vlSamples, t);
             vr = interp1(obj.tSamples, obj.vrSamples, t);
         end
