@@ -6,6 +6,7 @@ robot = raspbot('RaspBot-19');
 currT = 0;
 prevT = 0;
 firstIteration = false;
+
 vla = zeros(1, 1000);
 vra = zeros(1, 1000);
 tarr = zeros(1, 1000);
@@ -31,9 +32,6 @@ while(currT < b.getTrajectoryDuration())
     time = currT / t.ref.ks;
     
     [vl, vr] = t.getVlVrAtT(time);
-    
-    
-    
     [v, w] = robotModel.vlvrToVw(vl, vr);
     
     vl = vl / b.ks * 1.1458;
@@ -54,16 +52,17 @@ while(currT < b.getTrajectoryDuration())
     yarr(count) = y;
     tharr(count) = th;
     
-    
     if (isnan(vl))
         vl = 0;
     end
     if (isnan(vr))
         vr = 0;
     end
+    
     vla(count) = vl;
     vra(count) = vr;
     tarr(count) = time;
+    
     count = count + 1;
     robot.sendVelocity(vl, vr);
 %     s = v .* dt + slast;
@@ -77,4 +76,5 @@ tharr = tharr(1:count-1);
 realX = realX(1:count-1);
 realY = realY(1:count-1);
 realTh = realTh(1:count-1);
+plot(realX, realY);
 robot.shutdown();
