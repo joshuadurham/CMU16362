@@ -24,6 +24,12 @@ classdef trajectoryFollower
         
         function [realV, realw] = getRealVw(obj, t)
             [realV, realw] = obj.getRefVw(t);
+            if (isnan(realV))
+                realV = 0;
+            end
+            if (isnan(realw))
+                realw = 0;
+            end
             [uv, uw] = obj.controller.error();
             realV = realV + uv;
             realw = realw + uw;

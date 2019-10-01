@@ -70,7 +70,6 @@ classdef figure8
 %                     k = (obj.kk ./ obj.ks) * sin(obj.kth * s);
 %                     w = k .* v;
                     
-
                     [vl, vr] = robotModel.VwTovlvr(v, w);
 
                     th = th + obj.ks * w ./ 2 * dt;

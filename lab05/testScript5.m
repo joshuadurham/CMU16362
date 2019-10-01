@@ -40,8 +40,8 @@ while(currT < b.getTrajectoryDuration())
     dt = time - lastT;
     
     thReal = thReal + t.ref.ks * w ./2 * dt;
-    xReal = xReal + v * 1.1458 * dt * cos(thReal);
-    yReal = yReal + v * 1.1458 * dt * sin(thReal);
+    xReal = xReal + v * dt * cos(thReal);
+    yReal = yReal + v * dt * sin(thReal);
     thReal = thReal +  t.ref.ks * w ./2 * dt;
     realX(count) = xReal;
     realY(count) = yReal;

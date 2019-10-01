@@ -56,8 +56,8 @@ classdef robotTrajectory
                 else
                     [v, w] = obj.ref.computeControl(t);
                     dt = t - tlast;
-                    s = v .* dt * 1.1458 + slast;
-                    % s = v .* (t - obj.ref.tPause / (obj.ref.ks / obj.ref.kv));
+                    % s = v .* dt + slast;
+                    s = v .* (t - obj.ref.tPause / (obj.ref.ks / obj.ref.kv));
                     ds = s - slast;
 
                     [vl, vr] = robotModel.VwTovlvr(v, w);
