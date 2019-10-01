@@ -20,7 +20,7 @@ y = 0;
 theta = 0;
 frames = 0;
 
-robot = raspbot('RaspBot-19');
+robot = raspbot('RaspBot-16');
 initLeftEncoder = robot.encoders.LatestMessage.Vector.X;
 initRightEncoder = robot.encoders.LatestMessage.Vector.Y;
 robot.encoders.NewMessageFcn=@encoderEventListener;
@@ -43,7 +43,7 @@ refThArr = zeros(1, 1000);
 realX = zeros(1, 1000);
 realY = zeros(1, 1000);
 realTh = zeros(1, 1000);
-tau = 170;
+tau = 85;
 
 feedBack = true;
 
