@@ -38,7 +38,7 @@ classdef figure8
             obj.vlArr = zeros(obj.length);
             obj.vrArr = zeros(obj.length);
             obj.tArr = zeros(obj.length);
-            obj.Tf = (Ks / Kv) * obj.tf;
+            obj.Tf = (obj.ks / obj.kv) * obj.tf;
 
             count = 1;
             x = 0;

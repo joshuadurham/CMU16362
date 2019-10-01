@@ -66,8 +66,8 @@ classdef robotTrajectory
 %                     yReal = yReal + v * 1.1458 * dt * sin(thReal);
 %                     thReal = thReal +  t.ref.ks * w ./2 * dt;
                     th = th + obj.ref.ks * w ./ 2 * dt;
-                    x = x + ds * cos(th);
-                    y = y + ds * sin(th);
+                    x = x + ds * obj.ref.ks * cos(th);
+                    y = y + ds * obj.ref.ks * sin(th);
                     th = th + obj.ref.ks * w ./ 2 * dt;
                 end
                 
@@ -97,6 +97,12 @@ classdef robotTrajectory
         end
             
         function [xval, yval, thval] = getPoseAtT(obj,t)
+            if (t > obj.ref.tf + 2 * obj.ref.tPause)
+                xval = 0;
+                yval = 0;
+                thval = 0;
+                return;
+            end
             x = obj.poseSamples(1, :);
             y = obj.poseSamples(2, :);
             th = obj.poseSamples(3, :);

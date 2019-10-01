@@ -20,7 +20,7 @@ y = 0;
 theta = 0;
 frames = 0;
 
-robot = raspbot('RaspBot-11');
+robot = raspbot('sim', [0;0;0]);
 initLeftEncoder = robot.encoders.LatestMessage.Vector.X;
 initRightEncoder = robot.encoders.LatestMessage.Vector.Y;
 robot.encoders.NewMessageFcn=@encoderEventListener;
@@ -79,7 +79,6 @@ while(currT < dur)
     
     [vl, vr] = t.getVlVrAtT(time);
     [v, w] = robotModel.vlvrToVw(vl, vr);
-    [vl, vr] = robotModel.VwTovlvr(v, w);
     
     
     dt = time - lastT;
@@ -101,7 +100,7 @@ while(currT < dur)
         [v, w] = follow.getRealVw(time); 
     end
     
-
+    [vl, vr] = robotModel.VwTovlvr(v, w);
         
     realX(positionIdx) = xReal;
     realY(positionIdx) = yReal;

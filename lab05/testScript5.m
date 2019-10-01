@@ -1,7 +1,7 @@
 b = figure8(3, 1, 0);
 t = robotTrajectory(b, 0, 0, 0, 0, 1000, 0, b.tf + 2 * b.tPause);
 
-robot = raspbot('RaspBot-19');
+robot = raspbot('sim', [0; 0; 0]);
 
 currT = 0;
 prevT = 0;
@@ -34,8 +34,8 @@ while(currT < b.getTrajectoryDuration())
     [vl, vr] = t.getVlVrAtT(time);
     [v, w] = robotModel.vlvrToVw(vl, vr);
     
-    vl = vl / b.ks * 1.1458;
-    vr = vr / b.ks * 1.1458;
+%     vl = vl;
+%     vr = vr * 1.1458;
     
     dt = time - lastT;
     
