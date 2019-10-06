@@ -67,7 +67,7 @@ while(currT < t.ref.getTrajectoryDuration())
     [vl, vr] = t.getVlVrAtT(time);
     [v, w] = robotModel.vlvrToVw(vl, vr);
     
-    vl = vl / b.ks * 1.15;
+    vl = vl / b.ks * 1.155;
     vr = vr / b.ks * 1.15;
     
     dt = time - lastT;
@@ -97,9 +97,9 @@ while(currT < t.ref.getTrajectoryDuration())
     
     positionIdx = positionIdx + 1;
     robot.sendVelocity(vl, vr);
-    pause(0.05);
+    pause(0.04);
 end
-pause(1);
+pause(0.1);
 robot.stop();
 refXArr = refXArr(1:positionIdx-1);
 refYArr = refYArr(1:positionIdx-1);

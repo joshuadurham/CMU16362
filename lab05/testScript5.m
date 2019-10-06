@@ -37,6 +37,7 @@ while(currT < b.getTrajectoryDuration())
     vl = vl / b.ks * 1.1458;
     vr = vr / b.ks * 1.1458;
     
+    if (
     dt = time - lastT;
     
     thReal = thReal + t.ref.ks * w ./2 * dt;

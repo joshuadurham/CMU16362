@@ -56,18 +56,18 @@ classdef robotTrajectory
                 else
                     [v, w] = obj.ref.computeControl(t);
                     dt = t - tlast;
-                    s = v .* dt * 1.1458 + slast;
+                    s = v .* dt + slast;
                     % s = v .* (t - obj.ref.tPause / (obj.ref.ks / obj.ref.kv));
                     ds = s - slast;
 
                     [vl, vr] = robotModel.VwTovlvr(v, w);
-%                     thReal = thReal + t.ref.ks * w ./2 * dt;
-%                     xReal = xReal + v * 1.1458 * dt * cos(thReal);
-%                     yReal = yReal + v * 1.1458 * dt * sin(thReal);
-%                     thReal = thReal +  t.ref.ks * w ./2 * dt;
+                    thReal = thReal + t.ref.ks * w ./2 * dt;
+                    xReal = xReal + v * 1.1458 * dt * cos(thReal);
+                    yReal = yReal + v * 1.1458 * dt * sin(thReal);
+                    thReal = thReal +  t.ref.ks * w ./2 * dt;
                     th = th + obj.ref.ks * w ./ 2 * dt;
-                    x = x + ds * cos(th);
-                    y = y + ds * sin(th);
+                    x = x + obj.ref.ks * ds * cos(th);
+                    y = y + obj.ref.ks * ds * sin(th);
                     th = th + obj.ref.ks * w ./ 2 * dt;
                 end
                 
