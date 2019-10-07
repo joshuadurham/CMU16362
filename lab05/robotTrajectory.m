@@ -56,8 +56,11 @@ classdef robotTrajectory
                 else
                     [v, w] = obj.ref.computeControl(t);
                     dt = t - tlast;
+                    
                     s = v .* dt + slast;
                     % s = v .* (t - obj.ref.tPause / (obj.ref.ks / obj.ref.kv));
+                    % s = v .* dt + slast;
+                    s = v .* (t - obj.ref.tPause / (obj.ref.ks / obj.ref.kv));
                     ds = s - slast;
 
                     [vl, vr] = robotModel.VwTovlvr(v, w);
@@ -66,8 +69,12 @@ classdef robotTrajectory
                     yReal = yReal + v * 1.1458 * dt * sin(thReal);
                     thReal = thReal +  t.ref.ks * w ./2 * dt;
                     th = th + obj.ref.ks * w ./ 2 * dt;
+
                     x = x + obj.ref.ks * ds * cos(th);
                     y = y + obj.ref.ks * ds * sin(th);
+
+                    x = x + ds * obj.ref.ks * cos(th);
+                    y = y + ds * obj.ref.ks * sin(th);
                     th = th + obj.ref.ks * w ./ 2 * dt;
                 end
                 
@@ -97,6 +104,12 @@ classdef robotTrajectory
         end
             
         function [xval, yval, thval] = getPoseAtT(obj,t)
+            if (t > obj.ref.tf + 2 * obj.ref.tPause)
+                xval = 0;
+                yval = 0;
+                thval = 0;
+                return;
+            end
             x = obj.poseSamples(1, :);
             y = obj.poseSamples(2, :);
             th = obj.poseSamples(3, :);

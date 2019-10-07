@@ -10,6 +10,7 @@ function encoderEventListener(handle, event)
     global positionIdx;
     global initLeftEncoder;
     global initRightEncoder;
+    global frames
     
     currTimestamp = double(event.Header.Stamp.Sec) + ...
         double(event.Header.Stamp.Nsec)/1000000000.0;
@@ -30,5 +31,6 @@ function encoderEventListener(handle, event)
     x = x + positionChange*cos(theta);
     y = y + positionChange*sin(theta);
     theta = theta + thetaChange/2;
+    frames = frames + 1;
     % positionIdx = positionIdx + 1;
 end

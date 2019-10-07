@@ -25,11 +25,11 @@ initLeftEncoder = robot.encoders.LatestMessage.Vector.X;
 initRightEncoder = robot.encoders.LatestMessage.Vector.Y;
 
 % ADJUST THESE HERE
-useFeedback = false;
+useFeedback = true;
 timeDelay = 0.2;
-kp = 3;
+kp = 0.0;
 ki = 0.0;
-kd = 0.12;
+kd = 0.0;
 
 goalPosition = 1;
 vmax = 0.25;
@@ -68,6 +68,11 @@ while(currT < 6)
         firstIteration = true;
     end
     currT = toc(startTic);
+    if (currT > 4)
+        kp = 3;
+        ki = 0.0;
+        kd = 0.12;
+    end
     deltaT = currT - prevT;
     currIdealPos = currIdealPos + feedForward * deltaT;
     delayedCurrIdealPos = delayedCurrIdealPos + delayedFeedForward * deltaT;
