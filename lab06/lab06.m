@@ -1,4 +1,6 @@
-clear all;
+% clear all;
+keepvars = {'Varr', 'warr', 'vla', 'vra'};
+clearvars('-except', keepvars{:}) 
 clf;
 global wheelbase;
 global prevTimestamp;
@@ -16,9 +18,11 @@ wheelbase = 0.09;
 prevTimestamp = 0;
 prevLeftEncoder = 0;
 prevRightEncoder = 0;
+
 x = 0;
 y = 0;
 theta = 0;
+
 frames = 0;
 
 robot = raspbot('RaspBot-16');
@@ -56,9 +60,13 @@ refThArr = zeros(1, 1000, 3);
 realX = zeros(1, 1000, 3);
 realY = zeros(1, 1000, 3);
 realTh = zeros(1, 1000, 3);
+myVarr = zeros(1, 1000);
+mywarr = zeros(1, 1000);
+myvla = zeros(1, 1000);
+myvra = zeros(1, 1000);
 
 tau = 85;
-feedBack = true;
+feedBack = false;
 
 pause(3);
 
@@ -78,7 +86,6 @@ end
 
 robot.sendVelocity(0, 0);
 
-
 for i = 2:4
     sgn = 1;
     executeParam = params(i, :)';
@@ -96,28 +103,31 @@ for i = 2:4
     firstIteration = false;
     lastT = 0;
     
+    % coordinates of path origin wrt world
+    origin = sum(params(1:i-1, :), 1);
+    ox = origin(1);
+    oy = origin(2);
+    oth = origin(3);
+    originPose = pose(ox, oy, oth);
+    H = originPose.bToA();
+    
     while(currT < dur)
         if(firstIteration == false)
             startTic = tic();        
             firstIteration = true;
             continue;
         end
-        currT = toc(startTic);
-        dt = currT - lastT;
         
-        % coordinates of path origin wrt world
-        origin = params(i-1, :)';
-        ox = origin(1);
-        oy = origin(2);
-        oth = origin(3);
-        originPose = pose(ox, oy, oth);
+        currT = toc(startTic);
         
         % coordinates of robot wrt world
-        robPose = spline.getPoseAtTime(time);
+        robCoords = spline.getPoseAtTime(currT);
+        robPose = pose(robCoords(1), robCoords(2), robCoords(3));
+        robMat = robPose.bToA;
         
         % coordinates of robot wrt path origin
-        H = originPose.aToB();
-        relPose = H * robPose;
+        relMat = H * robMat;
+        relPose = pose.matToPoseVec(relMat);
         relx = relPose(1);
         rely = relPose(2);
         relth = relPose(3);
@@ -145,18 +155,23 @@ for i = 2:4
             
             % produce trajectory follower
             follow = trajectoryFollower(spline, control);
-            [V, w] = follow.getRealVw(time); 
+            [V, w] = follow.getRealVw(currT); 
         end
         
-        [vl, vr] = robotModel.VwTovlvr(V, w);
+        myVarr(1, positionIdx) = V;
+        mywarr(1, positionIdx) = w;
         
-        count = count + 1;
+        [vl, vr] = robotModel.VwTovlvr(V, w);
+        myvla(1, positionIdx) = vl;
+        myvra(1, positionIdx) = vr;
+        
+        positionIdx = positionIdx + 1;
 
-        % robot.sendVelocity(vl, vr);
-        lastT = currT;
+        robot.sendVelocity(vl, vr);
         pause(0.05);
     end
-    robot.stop()
+    robot.stop();
+    pause(0.1);
 end
 
 robot.stop();
@@ -179,8 +194,14 @@ hold on;
 xlabel('Robot X (meters)');
 ylabel('Robot Y (meters)');
 title('First Section');
-plot(-refYArr(:, :, 1), refXArr(:, :, 1));
-plot(-realY(:, :, 1), realX(:, :, 1));
+indX = refXArr(1, :, 1) ~= 0;
+indY = refYArr(1, :, 1) ~= 0;
+refX1 = refXArr(:, indX, 1);
+refY1 = refYArr(:, indY, 1);
+realX1 = realX(:, indX, 1);
+realY1 = realY(:, indY, 1);
+plot(refX1, refY1);
+plot(realX1, realY1);
 legend({'Reference Path', 'Robot Path'});
 
 figure(2)
@@ -189,8 +210,14 @@ hold on;
 xlabel('Robot X (m)');
 ylabel('Robot Y (m)');
 title('Second Section');
-plot(-refYArr(:, :, 2), refXArr(:, :, 2));
-plot(-realY(:, :, 2), realX(:, :, 2));
+indX = refXArr(1, :, 2) ~= 0;
+indY = refYArr(1, :, 2) ~= 0;
+refX2 = refXArr(:, indX, 2);
+refY2 = refYArr(:, indY, 2);
+realX2 = realX(:, indX, 2);
+realY2 = realY(:, indY, 2);
+plot(refX2, refY2);
+plot(realX2, realY2);
 legend({'Reference Path', 'Robot Path'});
 
 figure(3)
@@ -199,6 +226,12 @@ hold on;
 hold on;
 xlabel('Robot X (m)');
 ylabel('Robot Y (m)');
-plot(-refYArr(:, :, 3), refXArr(:, :, 3));
-plot(-realY(:, :, 3), realX(:, :, 3));
+indX = refXArr(1, :, 3) ~= 0;
+indY = refYArr(1, :, 3) ~= 0;
+refX3 = refXArr(:, indX, 3);
+refY3 = refYArr(:, indY, 3);
+realX3 = realX(:, indX, 3);
+realY3 = realY(:, indY, 3);
+plot(refX3, refY3);
+plot(realX3, realY3);
 legend({'Reference Path', 'Robot Path'});
