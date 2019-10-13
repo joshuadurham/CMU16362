@@ -44,12 +44,14 @@ classdef estRobot
             obj.initLeftEncoder = lEnc;
             obj.initRightEncoder = rEnc;
             obj.lastTime = timeStamp;
-            obj.prevLeftEncoder = lEnc;
-            obj.prevRightEncoder = rEnc;
+            obj.prevLeftEncoder = 0;
+            obj.prevRightEncoder = 0;
         end 
         
         function obj = updatePosition(obj, lEnc, rEnc)
             % pass in the queried odometry at the top of the loop
+            lEnc = lEnc - obj.initLeftEncoder;
+            rEnc = rEnc - obj.initRightEncoder;
             lDiff = lEnc - obj.prevLeftEncoder;
             rDiff = rEnc - obj.prevRightEncoder;
             
@@ -65,10 +67,10 @@ classdef estRobot
             obj.prevRightEncoder = rEnc;
         end
         
-        function pose = getRobotPose(obj)
-            pose = [obj.x;
-                    obj.y;
-                    obj.th];
+        function [x, y, th] = getRobotPose(obj)
+            x = obj.x;
+            y = obj.y;
+            th = obj.th;
         end
     end
 end

@@ -19,7 +19,6 @@ classdef mrplSystem
         realX
         realY
         realTh
-        Two
         spline
     end
     
@@ -40,11 +39,10 @@ classdef mrplSystem
             obj.refX = zeros(1, 1500);
             obj.refY = zeros(1, 1500);
             obj.refTh = zeros(1, 1500);
-            obj.Two = 0;
             obj.spline = 0;
         end
         
-        function [V, w] = useFeedback(obj, refPose, acPose)
+        function [V, w] = useFeedback(obj, refPose, acPose, tau, currT)
             % compute the controller with properly adjusted coordinates
             control = controller(refPose, acPose, obj.Vref, tau);
             % produce trajectory follower
@@ -52,7 +50,7 @@ classdef mrplSystem
             [V, w] = follow.getRealVw(currT); 
         end
         
-        function [xf, yf, thf] = getEndpointToOriginPose(obj, pointNumber)
+        function [xf, yf, thf, Two] = getEndpointToOriginPose(obj, pointNumber)
             i = pointNumber;
             % transform of world wrt robot origin
             origin = obj.endpoints(i-1, :);
@@ -60,7 +58,7 @@ classdef mrplSystem
             oy = origin(2);
             oth = origin(3);
             originPose = pose(ox, oy, oth);
-            obj.Two = originPose.aToB();
+            Two = originPose.aToB();
 
             % transform of endpoint wrt world
             nextPoint = obj.endpoints(i, :);
@@ -71,22 +69,22 @@ classdef mrplSystem
             Tew = nextPose.bToA();
 
             % transform of endpoints wrt robot origin
-            Toe = obj.Two * Tew;
+            Toe = Two * Tew;
             endToRobotPose = pose.matToPoseVec(Toe);
             xf = endToRobotPose(1);
             yf = endToRobotPose(2);
             thf = endToRobotPose(3);
         end
         
-        function [relx, rely, relth] = getReferenceToWorldPose(obj, currT)
+        function [relx, rely, relth] = getReferenceToWorldPose(obj, currT, Two)
             % coordinates of reference wrt path origin
             robToOriginCoords = obj.spline.getPoseAtTime(currT);
-            robToOriginPose = pose(robToOriginCoords(1), robToOriginCoords(2), robToOriginCoords(3));
+            robToOriginPose = pose(robToOriginCoords(1), -robToOriginCoords(2), robToOriginCoords(3));
             Tro = robToOriginPose.bToA;
 
             % coordinates of reference wrt world
             % finds inverse of ref to origin * origin to world 
-            Trw = Tro/obj.Two;
+            Trw = Two\Tro;
             relPose = pose.matToPoseVec(Trw);
             relx = relPose(1);
             rely = relPose(2);
@@ -104,7 +102,7 @@ classdef mrplSystem
         
         function obj = updateStateEst(obj)
             [left, right, ~] = estRobot.getEncData();
-            obj.estRobot.updatePosition(left, right);
+            obj.estRobot = obj.estRobot.updatePosition(left, right);
         end
         
         function plotData(obj)
@@ -113,8 +111,8 @@ classdef mrplSystem
             xlabel('Robot X (meters)');
             ylabel('Robot Y (meters)');
             title('First Section');
-            plot(-obj.refY, obj.refX);
-            plot(-obj.realY, obj.realX);
+            plot(obj.refX, obj.refY);
+            plot(obj.realX, obj.realY);
             legend({'Reference Path', 'Robot Path'});
         end
         
@@ -138,7 +136,10 @@ classdef mrplSystem
             initTime = timestamp;
             
             % set baseline for state estimator
-            obj.estRobot.setInitEncoder(initLeftEncoder, initRightEncoder, initTime);
+            obj.estRobot.initLeftEncoder = initLeftEncoder;
+            obj.estRobot.initRightEncoder = initRightEncoder;
+            obj.estRobot.lastTime = initTime;
+            
 
             xlim([-0.6 0.6]);
             ylim([-0.6 0.6]);
@@ -147,8 +148,8 @@ classdef mrplSystem
             ylabel('y (meters)');
 
             positionIdx = 1;
-            tau = 85;
-            feedBack = false;
+            tau = 40;
+            feedBack = true;
 
             control = 0;
             acPose = 0;
@@ -165,9 +166,10 @@ classdef mrplSystem
             
             for i = 2:4
                 sgn = 1;
-                [xf, yf, thf] = obj.getEndpointToOriginPose(i);
+                [xf, yf, thf, Two] = obj.getEndpointToOriginPose(i);
                 
                 obj.spline = cubicSpiral.planTrajectory(xf, yf, thf, sgn);
+                obj.spline.reflectX();
                 obj.spline.planVelocities(obj.Vref);
 
                 dur = obj.spline.getTrajectoryDuration();
@@ -183,13 +185,13 @@ classdef mrplSystem
                     end
                     
                     % update our state estimation
-                    obj.updateStateEst();
+                    obj = obj.updateStateEst();
                     
                     % clock time
                     currT = toc(startTic);
                     
                     % get goal position
-                    [relx, rely, relth] = obj.getReferenceToWorldPose(currT);
+                    [relx, rely, relth] = obj.getReferenceToWorldPose(currT, Two);
                     obj.refX(1, positionIdx) = relx;
                     obj.refY(1, positionIdx) = rely;
                     obj.refTh(1, positionIdx) = relth;
@@ -208,7 +210,7 @@ classdef mrplSystem
                         % compute the controller with properly adjusted coordinates
                         refPose = pose(relx, rely, relth);
                         acPose = pose(xReal, yReal, thReal);
-                        [V, w] = obj.useFeedback(refPose, acPose);
+                        [V, w] = obj.useFeedback(refPose, acPose, tau, currT);
                     end
 
                     [vl, vr] = robotModel.VwTovlvr(V, w);
@@ -223,7 +225,7 @@ classdef mrplSystem
             robot.stop();
             robot.shutdown();
             
-            obj.truncArrays(positionIdx);
+            obj = obj.truncArrays(positionIdx);
             obj.plotData();
         end
         

@@ -38,6 +38,9 @@ classdef controller
             eth = errVec(3);
             % not sure if next line is necessary but hey why not
             eth = atan2(sin(eth), cos(eth));
+            if (eth > 0.5)
+                eth = 0.5;
+            end
             uV = obj.kx*ex;
             uOmega = obj.ky*ey+obj.kth*eth;
         end
