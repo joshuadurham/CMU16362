@@ -20,10 +20,6 @@ classdef trajectoryFollower
             refw = obj.traj.getwAtTime(t);
         end
         
-        function refPose = getRefPose(obj, t)
-            refPose = obj.traj.getPoseAtTime(t);
-        end
-        
         function [realV, realw] = getRealVw(obj, t)
             [realV, realw] = obj.getRefVw(t);
             if (isnan(realV))

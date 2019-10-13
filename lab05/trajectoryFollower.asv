@@ -24,6 +24,24 @@ classdef trajectoryFollower
             refPose = obj.traj.getPoseAtTime(t);
         end
         
+        function realPose = getRealPose(obj)
+            global rightEncoderDiff;
+            global leftEncoderDiff;
+            lDiff = leftEncoderDiff;
+            rDiff = rightEncoderDiff;
+            
+            thetaChange = atan((lDiff - rDiff)/wheelbase);
+            positionChange = (lDiff + rDiff)/2;
+            
+            theta = theta + thetaChange/2;
+            x = x + positionChange*cos(theta);
+            y = y + positionChange*sin(theta);
+            theta = theta + thetaChange/2;
+            realPose = [x;
+                        y;
+                        theta]
+        end
+        
         function [realV, realw] = getRealVw(obj, t)
             [realV, realw] = obj.getRefVw(t);
             if (isnan(realV))

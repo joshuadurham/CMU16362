@@ -7,7 +7,6 @@ function encoderEventListener(handle, event)
     global initRightEncoder;
     global leftEncoderDiff;
     global rightEncoderDiff;
-    global frames;
  
     currTimestamp = double(event.Header.Stamp.Sec) + ...
         double(event.Header.Stamp.Nsec)/1000000000.0;
@@ -21,6 +20,5 @@ function encoderEventListener(handle, event)
     prevTimestamp = currTimestamp;
     prevLeftEncoder = currLeftEncoder;
     prevRightEncoder = currRightEncoder;
-    frames = frames + 1;
     
 end

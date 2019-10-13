@@ -1,14 +1,8 @@
-% clear all;
-keepvars = {'Varr', 'warr', 'vla', 'vra'};
-clearvars('-except', keepvars{:}) 
+clear all;
 clf;
-global wheelbase;
 global prevTimestamp;
 global prevLeftEncoder;
 global prevRightEncoder;
-global x;
-global y;
-global theta;
 global robot;
 global initLeftEncoder;
 global initRightEncoder;
@@ -18,12 +12,6 @@ wheelbase = 0.09;
 prevTimestamp = 0;
 prevLeftEncoder = 0;
 prevRightEncoder = 0;
-
-x = 0;
-y = 0;
-theta = 0;
-
-frames = 0;
 
 robot = raspbot('RaspBot-16');
 initLeftEncoder = robot.encoders.LatestMessage.Vector.X;
@@ -50,20 +38,12 @@ currT = 0;
 prevT = 0;
 firstIteration = false;
 
-% vla = zeros(1, 1000);
-% vra = zeros(1, 1000);
-% tarr = zeros(1, 1000);
-
-refXArr = zeros(1, 1000, 3);
-refYArr = zeros(1, 1000, 3);
-refThArr = zeros(1, 1000, 3);
-realX = zeros(1, 1000, 3);
-realY = zeros(1, 1000, 3);
-realTh = zeros(1, 1000, 3);
-myVarr = zeros(1, 1000);
-mywarr = zeros(1, 1000);
-myvla = zeros(1, 1000);
-myvra = zeros(1, 1000);
+refXArr = zeros(1, 1000);
+refYArr = zeros(1, 1000);
+refThArr = zeros(1, 1000);
+realX = zeros(1, 1000);
+realY = zeros(1, 1000);
+realTh = zeros(1, 1000);
 
 tau = 85;
 feedBack = false;

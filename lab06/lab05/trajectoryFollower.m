@@ -13,18 +13,17 @@ classdef trajectoryFollower
             obj.controller = controller;
         end
         
-        function [refV, refw] = getRefVw(obj, t)
+        function [refV, refw] = getRefVwAtT(obj, t)
             %METHOD1 Summary of this method goes here
             %   Detailed explanation goes here
             refV = obj.traj.getVAtTime(t);
             refw = obj.traj.getwAtTime(t);
         end
         
-        function refPose = getRefPose(obj, t)
-            refPose = obj.traj.getPoseAtTime(t);
-        end
+        function refPose = getRefPoseAtT(obj, t)
+            
         
-        function [realV, realw] = getRealVw(obj, t)
+        function [realV, realw] = getRealVwAtT(obj, t)
             [realV, realw] = obj.getRefVw(t);
             if (isnan(realV))
                 realV = 0;
