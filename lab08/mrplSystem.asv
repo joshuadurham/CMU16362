@@ -14,7 +14,6 @@ classdef mrplSystem
         Psr = pose(0, 0, (5 * pi) / 180);
         Tsr = Psr.bToA;
         maxLen = 14; % test for now
-        arrLen = 2000;
     end
     
     properties
@@ -37,21 +36,15 @@ classdef mrplSystem
             %          0.3048, 0.3048, 0.0;
             %         -0.3048, -0.3048, - pi()/2.0;
             %         -0.6096, 0, 0];
-            if (nargin == 1)
-                obj.endpoints = endpoints;
-            else
-                obj.endpoints = [0, 0, 0];
-            end 
+            obj.endpoints = endpoints;
             % estBot: odometry/estimated state of the robot
             obj.estRobot = estRobot(obj.wheelbase);
-            % state estimated arrays of data
-            obj.realX = zeros(1, obj.arrLen);
-            obj.realY = zeros(1, obj.arrLen);
-            obj.realTh = zeros(1, obj.arrLen);
-            % reference arrays of data
-            obj.refX = zeros(1, obj.arrLen);
-            obj.refY = zeros(1, obj.arrLen);
-            obj.refTh = zeros(1, obj.arrLen);
+            obj.realX = zeros(1, 1500);
+            obj.realY = zeros(1, 1500);
+            obj.realTh = zeros(1, 1500);
+            obj.refX = zeros(1, 1500);
+            obj.refY = zeros(1, 1500);
+            obj.refTh = zeros(1, 1500);
             obj.spline = 0;
         end
         
@@ -285,8 +278,8 @@ classdef mrplSystem
             obj.updateStateEst();
             pause(3);
             robot.sendVelocity(0, 0);
-            i = 0;
-            while i < 3
+            i = 
+            while i < 4
                 laserData = robot.laser.LatestMessage.Ranges;
                 sailFinder = rangeImage(laserData, 1, true);
                 % returns Pgr, pose of goal to robot (not the actual
@@ -306,7 +299,6 @@ classdef mrplSystem
                 pause(2);
                 robot.forksDown();
                 pause(15);
-                i = i + 1;
                 
 % The commented section should be handled by calling obj.runRobot(Two,
 % tau, endPose, positionIdx). Once confirmed to work, delete this section of code            

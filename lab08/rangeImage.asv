@@ -87,21 +87,17 @@ classdef rangeImage < handle
             plot(goodX, goodY);
         end
         
-        function inRangeMids = roiFilter(obj)
-            % Returns a list of potential middle points in the bounding rectangle
-            % Assumes that the y coordinates start with the left from the
-            % robot front being positive, and the right from the robot's
-            % front being negative
-            xBound = obj.boundingRect(1);
-            yBound = obj.boundingRect(2);
-            wBound = obj.boundingRect(3);
-            hBound = obj.boundingRect(4);
-            combMids = [obj.xArray;
-                        obj.yArray];
-            combMids = combMids(:, combMids(1, :) > xBound);
-            combMids = combMids(:, combMids(1, :) < xBound + wBound);
-            combMids = combMids(:, combMids(2, :) < yBound);
-            inRangeMids = combMids(:, combMids(2, :) > yBound + hBound);
+        function [xMids, yMids] = roiFilter(obj)
+            [xBound, yBound, wBound, hBound] = obj.boundingRect;
+            xMids = obj.xArray(obj.xArray > xBound && obj.xArray < xBound + hBound);
+            yMids = obj.yArray(obj.yArray < yBound && obj.yArray > yBound + hBound);
+            if (x < objboundx || x > xBound + wBound)
+                inRange = false;
+            elseif (y > yBound || y < yBound + hBound)
+                inRange = false;
+            else
+                inRange = true;
+            end
         end
 
         function [xPos, yPos, th, err, num] = findLineCandidate(obj, middle, maxLen)
