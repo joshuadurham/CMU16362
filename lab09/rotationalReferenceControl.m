@@ -36,13 +36,18 @@ classdef rotationalReferenceControl
             %   Detailed explanation goes here
             obj.amax = amax;
             obj.vmax = vmax;
-            obj.wmax = 2*vmax / obj.wheelbase;
-            obj.angleAMax = 2*amax / obj.wheelbase;
+            obj.wmax = 4*vmax / obj.wheelbase;
+            obj.angleAMax = 4*amax / obj.wheelbase;
             obj.angle = angle;
-            obj.arclen = angle * obj.wheelbase / 2;
             
+            obj.arclen = angle * obj.wheelbase / 2;
             obj.sgn = sgn;
             obj.tRamp = obj.wmax / obj.angleAMax;
+            if obj.angle < obj.wmax * obj.tRamp
+                obj.wmax = obj.angle / 1.5;
+                obj.angleAMax = obj.wmax * 2;
+                obj.tRamp = obj.wmax / obj.angleAMax;
+            end 
             obj.tf = (obj.angle + ((obj.wmax).^2)/obj.angleAMax)/obj.wmax;
             obj.tPause = tPause;
             obj.ks = 1;
