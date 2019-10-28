@@ -18,6 +18,7 @@ classdef trapezoidalReferenceControl
         delayedArr
         realArr
         errArr
+        velArr
         tArr
         ks
         kv
@@ -33,6 +34,12 @@ classdef trapezoidalReferenceControl
             obj.dist = dist;
             obj.sgn = sgn;
             obj.tRamp = obj.vmax / obj.amax;
+            
+            if obj.dist < obj.vmax * obj.tRamp
+                obj.vmax = obj.dist / 2;
+                obj.amax = obj.vmax;
+                obj.tRamp = obj.vmax / obj.amax;
+            end 
             obj.tf = (obj.dist + ((obj.vmax).^2)/obj.amax)/obj.vmax;
             obj.tPause = tPause;
             obj.ks = 1;
@@ -48,7 +55,6 @@ classdef trapezoidalReferenceControl
             currT = 0;
             prevT = 0;
 
-            delayedFeedForward = 0;
             currIdealPos = 0;
             delayedCurrIdealPos = 0;
             firstIteration = false;
@@ -59,6 +65,7 @@ classdef trapezoidalReferenceControl
             obj.delayedArr = zeros(1, len);
             obj.realArr = zeros(1, len);
             obj.errArr = zeros(1, len);
+            obj.velArr = zeros(1, len);
             obj.tArr = zeros(1, len);
 
             count = 1;
@@ -72,6 +79,7 @@ classdef trapezoidalReferenceControl
                 currT = toc(startTic);
                 deltaT = currT - prevT;
                 feedForward = obj.computeControl(currT);
+                obj.velArr(count) = feedForward;
                 currIdealPos = currIdealPos + feedForward * deltaT;
                 delayedFeedForward = obj.computeControl(currT - obj.Tdelay);
                 delayedCurrIdealPos = delayedCurrIdealPos + delayedFeedForward * deltaT;
@@ -84,6 +92,7 @@ classdef trapezoidalReferenceControl
             end
             obj.idealArr = obj.idealArr(1:count-1);
             obj.delayedArr = obj.delayedArr(1:count-1);
+            obj.velArr = obj.velArr(1:count-1);
             obj.tArr = obj.tArr(1:count-1);
         end
 
@@ -101,6 +110,14 @@ classdef trapezoidalReferenceControl
                 V = 0;
             end
             V = obj.sgn * V;
+        end
+        
+        function V = getVAtTime(obj, t)
+            V = interp1(obj.tArr, obj.velArr, t);
+        end
+              
+        function w = getwAtTime(obj, t)
+            w = 0;
         end
 
         function duration = getTrajectoryDuration(obj)

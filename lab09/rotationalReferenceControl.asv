@@ -45,8 +45,8 @@ classdef rotationalReferenceControl
             obj.sgn = sgn;
             obj.tRamp = obj.wmax / obj.angleAMax;
             if obj.angle < obj.wmax * obj.tRamp
-                obj.wmax = obj.angle / 2;
-                obj.angleAMax = obj.wmax;
+                obj.wmax = obj.angle / 1.5;
+                obj.angleAMax = obj.wmax * 2;
                 obj.tRamp = obj.wmax / obj.angleAMax;
             end 
             obj.tf = (obj.angle + ((obj.wmax).^2)/obj.angleAMax)/obj.wmax;
@@ -89,7 +89,6 @@ classdef rotationalReferenceControl
                 deltaT = currT - prevT;
                 [~, ff] = obj.computeControl(currT);
                 feedForward = ff * sgn;
-                obj.wArr(count) = feedForward;
                 currIdealAngle = currIdealAngle + feedForward * deltaT;
                 delayedFeedForward = obj.computeControl(currT - obj.Tdelay) * sgn;
                 delayedCurrIdealAngle = delayedCurrIdealAngle + delayedFeedForward * deltaT;
@@ -102,7 +101,6 @@ classdef rotationalReferenceControl
             end
             obj.idealArr = obj.idealArr(1:count-1);
             obj.delayedArr = obj.delayedArr(1:count-1);
-            obj.wArr = obj.wArr(1:count-1);
             obj.tArr = obj.tArr(1:count-1);
         end
 
@@ -122,14 +120,6 @@ classdef rotationalReferenceControl
             % the right as negative
             % [~, w] = robotModel.vlvrToVw(-V, V);
             V = 0;
-        end
-
-        function V = getWAtTime(obj, t)
-            V = 0;
-        end
-              
-        function w = getwAtTime(obj, t)
-            w = interp1(obj.tArr, obj.wArr, t);
         end
 
         function duration = getTrajectoryDuration(obj)

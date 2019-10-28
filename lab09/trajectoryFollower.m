@@ -31,7 +31,7 @@ classdef trajectoryFollower
             if (ang) % angular error
                 [uv, uw] = obj.controller.turningError();
             elseif (lin) % feed forward
-                uv = 0;
+                [uv, ~] = obj.controller.error();
                 uw = 0;
             else % both errors
                 [uv, uw] = obj.controller.error();

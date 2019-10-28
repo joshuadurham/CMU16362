@@ -330,9 +330,9 @@ classdef mrplSystem
                 Tfr = Tpr * obj.Tfp;
                 Pfr = pose.matToPoseVec(Tfr);
                 xf = Pfr(1);
+                thf = Pfr(3);
                 
-                % assume straight line, if not then add in the small angle
-                % movements
+                % if straight line
                 obj = obj.runRobot(tau, feedBack, [xf, 0, 0], false, true, 1);
                 pause(1);
                 robot.forksUp();
@@ -342,14 +342,19 @@ classdef mrplSystem
                 % back up 5 cm
                 xf = obj.Pfp(1);
                 obj = obj.runRobot(tau, feedBack, [xf, 0, 0], false, true, -1);
-                % spin around
+                pause(1);
                 thf = pi;
-                obj.runRobot(tau, feedBack, [0, 0, thf], true, false, 1);
+                obj.runRobot(tau, feedBack, [0
+                % robot.forksUp();
+                pause(2);
                 % robot.forksDown();
                 if (i ~= 3)
-                    pause(10);
+                    pause(15);
                 end
                 i = i + 1;
+                
+
+                
             end
             robot.stopLaser();
             robot.stop();
