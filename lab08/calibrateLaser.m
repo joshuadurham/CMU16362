@@ -1,5 +1,5 @@
 % calibrate robot
-rb = raspbot('RaspBot-16');
+rb = raspbot('RaspBot-20');
 rb.startLaser();
 pause(5);
 laserData = rb.laser.LatestMessage.Ranges;
@@ -9,5 +9,5 @@ clf;
 sailFinder.plotXvsY(2);
 rb.stopLaser();
 rb.forksUp();
-
+save('TestLasers5.mat', 'laserData');
 rb.shutdown();
