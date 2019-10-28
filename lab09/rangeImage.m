@@ -7,7 +7,8 @@ classdef rangeImage < handle
         maxRangeForTarget = 1.0;
         % [x, y, w, h]
         %boundingRect = [0.0, 0.1, 0.20, -0.2];
-        maxPixelNum = 13;
+        edgeWeights = 10;
+        wallThresh = 1.25;
         boundingRect = [0.2, 0.3, 0.6, -0.6]
     end
     
@@ -120,26 +121,36 @@ classdef rangeImage < handle
             numPtsThresh = 5;
             eigThresh = 25;
             lengthDiffThresh = 5;
+            testBoxX = zeros(1, size(obj.rArray, 2));
+            testBoxY = zeros(1, size(obj.rArray, 2));
             candidateR = zeros(1, size(obj.rArray, 2));
             candidateT = zeros(1, size(obj.tArray, 2));
             candidateX = zeros(1, size(obj.xArray, 2));
             candidateY = zeros(1, size(obj.yArray, 2));
             candidateIdx = 0;
+            testBoxIdx = 0;
             middleX = middle(1);
             middleY = middle(2);
             for i=1:size(obj.rArray,2)
                 % filter out the points not in the bounding box
                 if sqrt((middleX - obj.xArray(i))^2 + (middleY - obj.yArray(i))^2) < (maxLen / 2)
                     candidateIdx = candidateIdx + 1;
+                    testBoxIdx = testBoxIdx + 1;
                     candidateR(candidateIdx) = obj.rArray(i);
                     candidateT(candidateIdx) = obj.tArray(i);
                     candidateX(candidateIdx) = obj.xArray(i);
                     candidateY(candidateIdx) = obj.yArray(i);
+                    testBoxX(testBoxIdx) = obj.xArray(i);
+                    testBoxY(testBoxIdx) = obj.yArray(i);
+                elseif sqrt((middleX - obj.xArray(i))^2 + (middleY - obj.yArray(i))^2) < (maxLen / 1.5)
+                    testBoxIdx = testBoxIdx + 1;
+                    testBoxX(testBoxIdx) = obj.edgeWeights * obj.xArray(i);
+                    testBoxY(testBoxIdx) = obj.edgeWeights * obj.yArray(i);
                 end
             end
             % filter if not enough candidate points or the line is too long
             % (wall)
-            if candidateIdx == 0 || candidateIdx >= obj.maxPixelNum
+            if candidateIdx == 0
                 xPos = 0;
                 yPos = 0;
                 th = 0;
@@ -150,11 +161,21 @@ classdef rangeImage < handle
                 t = candidateT(1:candidateIdx);
                 x = candidateX(1:candidateIdx);
                 y = candidateY(1:candidateIdx);
+                xTest = testBoxX(1:testBoxIdx);
+                yTest = testBoxY(1:testBoxIdx);
                 Ixx = x * x';
                 Iyy = y * y';
                 Ixy = -x * y';
+                Testxx = xTest * xTest';
+                Testyy = yTest * yTest';
+                Testxy = -xTest * yTest';
+                
+                testInertia = [Testxx Testxy; Testxy Testyy] ./ testIdx;
                 inertia = [Ixx Ixy; Ixy Iyy] / candidateIdx; %normalized
+                testLambda = eig(testInertia);
                 lambda = eig(inertia);
+                
+                   
                 lambda = sqrt(lambda) * 1000.0;
             
                 maxX = max(x);
@@ -164,7 +185,7 @@ classdef rangeImage < handle
 
                 boundingLen = sqrt((maxX - minX)^2 + (maxY - minY)^2);
 
-                if candidateIdx < numPtsThresh || lambda(1) >= eigThresh || boundingLen > (1 + lengthDiffThresh) * maxLen || boundingLen < (1 - lengthDiffThresh) * maxLen
+                if candidateIdx < numPtsThresh || lambda(1) >= eigThresh || boundingLen > (1 + lengthDiffThresh) * maxLen || boundingLen < (1 - lengthDiffThresh) * maxLen || testLambda(1) / lambda(1) < obj.wallThresh && candidateIdx ~= testBoxIdx
                     xPos = 0;
                     yPos = 0;
                     err = 100000000;
