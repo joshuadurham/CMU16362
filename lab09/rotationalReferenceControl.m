@@ -1,11 +1,17 @@
-classdef trapezoidalReferenceControl
+classdef rotationalReferenceControl
     %UNTITLED3 Summary of this class goes here
     %   Detailed explanation goes here
-    
+    properties(Constant)
+        wheelbase = 0.09
+    end
+        
     properties
         amax
         vmax
-        dist
+        wmax
+        angleAMax
+        angle
+        arclen
         sgn
         tPause
         tRamp
@@ -25,15 +31,19 @@ classdef trapezoidalReferenceControl
     end
     
     methods
-        function obj = trapezoidalReferenceControl(amax, vmax, dist, sgn, tPause)
+        function obj = rotationalReferenceControl(amax, vmax, angle, sgn, tPause)
             %UNTITLED3 Construct an instance of this class
             %   Detailed explanation goes here
             obj.amax = amax;
             obj.vmax = vmax;
-            obj.dist = dist;
+            obj.wmax = 2*vmax / obj.wheelbase;
+            obj.angleAMax = 2*amax / obj.wheelbase;
+            obj.angle = angle;
+            obj.arclen = angle * obj.wheelbase / 2;
+            
             obj.sgn = sgn;
-            obj.tRamp = obj.vmax / obj.amax;
-            obj.tf = (obj.dist + ((obj.vmax).^2)/obj.amax)/obj.vmax;
+            obj.tRamp = obj.wmax / obj.angleAMax;
+            obj.tf = (obj.angle + ((obj.wmax).^2)/obj.angleAMax)/obj.wmax;
             obj.tPause = tPause;
             obj.ks = 1;
             obj.kv = 1;
@@ -49,8 +59,8 @@ classdef trapezoidalReferenceControl
             prevT = 0;
 
             delayedFeedForward = 0;
-            currIdealPos = 0;
-            delayedCurrIdealPos = 0;
+            currIdealAngle = 0;
+            delayedCurrIdealAngle = 0;
             firstIteration = false;
 
             % Graphing setup
@@ -71,12 +81,13 @@ classdef trapezoidalReferenceControl
                 end
                 currT = toc(startTic);
                 deltaT = currT - prevT;
-                feedForward = obj.computeControl(currT);
-                currIdealPos = currIdealPos + feedForward * deltaT;
-                delayedFeedForward = obj.computeControl(currT - obj.Tdelay);
-                delayedCurrIdealPos = delayedCurrIdealPos + delayedFeedForward * deltaT;
-                obj.idealArr(count) = currIdealPos;
-                obj.delayedArr(count) = delayedCurrIdealPos;
+                [~, ff] = obj.computeControl(currT);
+                feedForward = ff * sgn;
+                currIdealAngle = currIdealAngle + feedForward * deltaT;
+                delayedFeedForward = obj.computeControl(currT - obj.Tdelay) * sgn;
+                delayedCurrIdealAngle = delayedCurrIdealAngle + delayedFeedForward * deltaT;
+                obj.idealArr(count) = currIdealAngle;
+                obj.delayedArr(count) = delayedCurrIdealAngle;
                 obj.tArr(count) = currT;
                 count = count + 1;
                 prevT = currT;
@@ -88,19 +99,21 @@ classdef trapezoidalReferenceControl
         end
 
         function [V, w] = computeControl(obj, t)
-            w = 0;
             if (t < 0 || t > obj.tf)
-                V = 0;
+                w = 0;
             elseif (t < obj.tRamp)
-                V = obj.amax * t;
+                w = obj.angleAMax * t;
             elseif (obj.tf - t < obj.tRamp)
-                V = obj.amax * (obj.tf - t);
+                w = obj.angleAMax * (obj.tf - t);
             elseif (obj.tRamp < t && t < obj.tf - obj.tRamp)
-                V = obj.vmax;
+                w = obj.wmax;
             else
-                V = 0;
+                w = 0;
             end
-            V = obj.sgn * V;
+            % computes angles turning to the left as positive, angles to
+            % the right as negative
+            % [~, w] = robotModel.vlvrToVw(-V, V);
+            V = 0;
         end
 
         function duration = getTrajectoryDuration(obj)
@@ -111,4 +124,3 @@ classdef trapezoidalReferenceControl
     end
 end
 
-    

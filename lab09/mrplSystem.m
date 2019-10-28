@@ -14,6 +14,7 @@ classdef mrplSystem
         % 0.0337 specifically for Robit 16
         maxLen = 0.13; % test for now
         arrLen = 2000;
+        amax = 0.1;
     end
     
     properties
@@ -59,12 +60,12 @@ classdef mrplSystem
 
         end
         
-        function [V, w] = useFeedback(obj, refPose, acPose, tau, currT)
+        function [V, w] = useFeedback(obj, refPose, acPose, tau, currT, ang, lin)
             % compute the controller with properly adjusted coordinates
             control = controller(refPose, acPose, obj.Vref, tau);
             % produce trajectory follower
             follow = trajectoryFollower(obj.spline, control);
-            [V, w] = follow.getRealVw(currT); 
+            [V, w] = follow.getRealVw(currT, ang, lin); 
         end
         
         function Two = getWorldToOriginT(obj)
@@ -181,7 +182,7 @@ classdef mrplSystem
             disp([xf, yf, thf]);
         end 
         
-        function obj = runRobot(obj, tau, feedBack, endPoint)
+        function obj = runRobot(obj, tau, feedBack, endPoint, ang, lin, sgn)
             global robot;
             global positionIdx;
             Two = obj.getWorldToOriginT();
@@ -190,8 +191,13 @@ classdef mrplSystem
             thf = endPoint(3);
             sgn = 1;
             
-            obj.spline = cubicSpiral.planTrajectory(xf, yf, thf, sgn);
-            obj.spline.planVelocities(obj.Vref);
+            if (lin)
+                obj.spline = trajectoryReferenceControl(obj.amax, obj.Vref, endPoint(1), sgn, 0);
+            elseif (ang)
+                
+            else
+                obj.spline = cubicSpiral.planTrajectory(xf, yf, thf, sgn);
+                obj.spline.planVelocities(obj.Vref);
             
             % pushes the robot on the actual trajectory
             dur = obj.spline.getTrajectoryDuration();
