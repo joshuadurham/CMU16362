@@ -6,7 +6,9 @@ classdef rangeImage < handle
         minUsefulRange = 0.05;
         maxRangeForTarget = 1.0;
         % [x, y, w, h]
-        boundingRect = [0.35, 0.1, 0.20, -0.2];
+        %boundingRect = [0.0, 0.1, 0.20, -0.2];
+        maxPixelNum = 13;
+        boundingRect = [0.2, 0.3, 0.6, -0.6]
     end
     
     properties(Access = public)
@@ -42,10 +44,10 @@ classdef rangeImage < handle
             % result should not be used by any routine that expects the
             % points to be equally separated in angle. The operation is
             % done inline and removed data is deleted.
-            goodR = zeros(1, len(obj.rArray));
-            goodT = zeros(1, len(obj.tArray));
-            goodX = zeros(1, len(obj.xArray));
-            goodY = zeros(1, len(obj.yArray));
+            goodR = zeros(1, size(obj.rArray, 2));
+            goodT = zeros(1, size(obj.tArray, 2));
+            goodX = zeros(1, size(obj.xArray, 2));
+            goodY = zeros(1, size(obj.yArray, 2));
             numGood = 0;
             for i=1:length(obj.rArray)
                 if obj.rArray(i) <= obj.maxUsefulRange && obj.rArray(i) >= obj.minUsefulRange
@@ -84,20 +86,24 @@ classdef rangeImage < handle
             inRange = obj.rArray < maxRange;
             goodX = obj.xArray(inRange);
             goodY = obj.yArray(inRange);
-            plot(goodX, goodY);
+            scatter(goodX, goodY);
         end
         
-        function [xMids, yMids] = roiFilter(obj)
-            [xBound, yBound, wBound, hBound] = obj.boundingRect;
-            xMids = obj.xArray(obj.xArray > xBound && obj.xArray < xBound + hBound);
-            yMids = obj.yArray(obj.yArray < yBound && obj.yArray > yBound + hBound);
-            if (x < objboundx || x > xBound + wBound)
-                inRange = false;
-            elseif (y > yBound || y < yBound + hBound)
-                inRange = false;
-            else
-                inRange = true;
-            end
+        function inRangeMids = roiFilter(obj)
+            % Returns a list of potential middle points in the bounding rectangle
+            % Assumes that the y coordinates start with the left from the
+            % robot front being positive, and the right from the robot's
+            % front being negative
+            xBound = obj.boundingRect(1);
+            yBound = obj.boundingRect(2);
+            wBound = obj.boundingRect(3);
+            hBound = obj.boundingRect(4);
+            combMids = [obj.xArray;
+                        obj.yArray];
+            combMids = combMids(:, combMids(1, :) > xBound);
+            combMids = combMids(:, combMids(1, :) < xBound + wBound);
+            combMids = combMids(:, combMids(2, :) < yBound);
+            inRangeMids = combMids(:, combMids(2, :) > yBound + hBound);
         end
 
         function [xPos, yPos, th, err, num] = findLineCandidate(obj, middle, maxLen)
@@ -111,18 +117,17 @@ classdef rangeImage < handle
             % the provided maximum.  Return the line fit error, the number
             % of pixels participating, and the angle of the line relative
             % to the sensor
-            numPtsThresh = 4;
-            eigThresh = 1.3;
-            lengthDiffThresh = 0.2;
-            
-            candidateR = zeros(1, len(obj.rArray));
-            candidateT = zeros(1, len(obj.tArray));
-            candidateX = zeros(1, len(obj.xArray));
-            candidateY = zeros(1, len(obj.yArray));
+            numPtsThresh = 5;
+            eigThresh = 25;
+            lengthDiffThresh = 5;
+            candidateR = zeros(1, size(obj.rArray, 2));
+            candidateT = zeros(1, size(obj.tArray, 2));
+            candidateX = zeros(1, size(obj.xArray, 2));
+            candidateY = zeros(1, size(obj.yArray, 2));
             candidateIdx = 0;
             middleX = middle(1);
             middleY = middle(2);
-            for i=1:len(obj.rArray)
+            for i=1:size(obj.rArray,2)
                 % filter out the points not in the bounding box
                 if sqrt((middleX - obj.xArray(i))^2 + (middleY - obj.yArray(i))^2) < (maxLen / 2)
                     candidateIdx = candidateIdx + 1;
@@ -132,45 +137,78 @@ classdef rangeImage < handle
                     candidateY(candidateIdx) = obj.yArray(i);
                 end
             end
-            r = candidateR(1:candidateIdx);
-            t = candidateT(1:candidateIdx);
-            x = candidateX(1:candidateIdx);
-            y = candidateY(1:candidateIdx);
-            
-            Ixx = x' * x;
-            Iyy = y' * y;
-            Ixy = -x' * y;
-            inertia = [Ixx Ixy; Ixy Iyy] / numPts; %normalized
-            lambda = eig(inertia);
-            lambda = sqrt(lambda) * 1000.0;
-            
-            maxX = max(x);
-            minX = min(x);
-            maxY = max(y);
-            minY = min(y);
-            
-            boundingLen = sqrt((maxX - minX)^2 + (maxY - minY)^2);
-            
-            if candidateIdx < numPtsThresh || lambda(1) >= eigThresh || boundingLen > (1 + lengthDiffThresh) * maxLen || boundingLen < (1 - lengthDiffThresh) * maxLen
+            % filter if not enough candidate points or the line is too long
+            % (wall)
+            if candidateIdx == 0 || candidateIdx >= obj.maxPixelNum
                 xPos = 0;
                 yPos = 0;
-                err = 0;
-                num = 0;
                 th = 0;
-            else 
-                xPos = mean(x);
-                yPos = mean(y);
-                th = atan2(2 * Ixy, Iyy - Ixx)/2.0;
-                num = candidateIdx;
+                err = 10000;
+                num = 0;
+            else
+                r = candidateR(1:candidateIdx);
+                t = candidateT(1:candidateIdx);
+                x = candidateX(1:candidateIdx);
+                y = candidateY(1:candidateIdx);
+                Ixx = x * x';
+                Iyy = y * y';
+                Ixy = -x * y';
+                inertia = [Ixx Ixy; Ixy Iyy] / candidateIdx; %normalized
+                lambda = eig(inertia);
+                lambda = sqrt(lambda) * 1000.0;
+            
+                maxX = max(x);
+                minX = min(x);
+                maxY = max(y);
+                minY = min(y);
 
-                perpTh = th + (pi/2);
-                slope = tan(perpTh);
-                
-                err = 0;
-                for i=1:num
-                    expectedY = slope*candidateX(i) - slope*xPos + yPos;
-                    residual = candidateY(i) - expectedY;
-                    err = err + residual*residual;
+                boundingLen = sqrt((maxX - minX)^2 + (maxY - minY)^2);
+
+                if candidateIdx < numPtsThresh || lambda(1) >= eigThresh || boundingLen > (1 + lengthDiffThresh) * maxLen || boundingLen < (1 - lengthDiffThresh) * maxLen
+                    xPos = 0;
+                    yPos = 0;
+                    err = 100000000;
+                    num = 0;
+                    th = 0;
+                else
+                    xPos = mean(x);
+                    yPos = mean(y);
+                    th = atan2(2 * Ixy, Iyy - Ixx)/2.0;
+                    if (th < pi/2)
+%                         disp("ADDING PI/2")
+                        th = th - (pi/2);
+                    else 
+%                         disp("SUBTRACTING FROM PI/2")
+                        th = (pi/2) - th;
+                    end
+                    if (th < -pi/2) 
+                        th = th + pi;
+                    end
+                    if (th > pi/2)
+                        th = th - pi;
+                    end
+                    % disp("FINAL THETA HERE");
+                    num = candidateIdx;
+                    perpTh = th + (pi/2);
+                    %slope = tan(perpTh);
+                    slope = tan(th);
+                    %disp("SLOPE")
+                    %disp(slope)
+                    err = 0;
+                    % Filters out things of more than 13 pixels
+                    for i=1:num
+                        expectedY = slope*candidateX(i) - slope*xPos + yPos;
+                        %disp("CANDIDATE X_I")
+                        %disp(candidateX(i))
+                        %disp("CANDIDATE Y_I")
+                        %disp(candidateY(i))
+                        residual = candidateY(i) - expectedY;
+                        %disp("RESIDUAL")
+                        %disp(residual)
+                        err = err + residual*residual;
+                        %disp("ERR")
+                        %disp(err)
+                    end
                 end
             end
         end

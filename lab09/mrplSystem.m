@@ -8,12 +8,12 @@ classdef mrplSystem
     properties(Constant)
         wheelbase = 0.09;
         Vref = 0.2;
-        Pgp = pose(-0.02, 0, 0);
-        Tgp = Pgp.bToA;
+        Pgp = pose(-0.075, 0, 0);
         % might need to be negative
-        Psr = pose(0, 0, (5 * pi) / 180);
-        Tsr = Psr.bToA;
-        maxLen = 14; % test for now
+        Psr = pose(0, 0, -0.0350);
+        % 0.0337 specifically for Robit 16
+        maxLen = 0.13; % test for now
+        arrLen = 2000;
     end
     
     properties
@@ -26,6 +26,8 @@ classdef mrplSystem
         realY
         realTh
         spline
+        Tgp
+        Tsr
     end
     
     methods
@@ -36,16 +38,25 @@ classdef mrplSystem
             %          0.3048, 0.3048, 0.0;
             %         -0.3048, -0.3048, - pi()/2.0;
             %         -0.6096, 0, 0];
-            obj.endpoints = endpoints;
+            if (nargin == 1)
+                obj.endpoints = endpoints;
+            else
+                obj.endpoints = [0, 0, 0];
+            end 
             % estBot: odometry/estimated state of the robot
             obj.estRobot = estRobot(obj.wheelbase);
-            obj.realX = zeros(1, 1500);
-            obj.realY = zeros(1, 1500);
-            obj.realTh = zeros(1, 1500);
-            obj.refX = zeros(1, 1500);
-            obj.refY = zeros(1, 1500);
-            obj.refTh = zeros(1, 1500);
+            % state estimated arrays of data
+            obj.realX = zeros(1, obj.arrLen);
+            obj.realY = zeros(1, obj.arrLen);
+            obj.realTh = zeros(1, obj.arrLen);
+            % reference arrays of data
+            obj.refX = zeros(1, obj.arrLen);
+            obj.refY = zeros(1, obj.arrLen);
+            obj.refTh = zeros(1, obj.arrLen);
             obj.spline = 0;
+            obj.Tgp = obj.Pgp.bToA;
+            obj.Tsr = obj.Psr.bToA;
+
         end
         
         function [V, w] = useFeedback(obj, refPose, acPose, tau, currT)
@@ -136,14 +147,15 @@ classdef mrplSystem
         
         function [xf, yf, thf, errf, numf] = findSail(obj, sailFinder)
             roiMidpoints = sailFinder.roiFilter();
-            roiSize = size(roiMidpoints, 2);
+            roiMidpoints = roiMidpoints';
+            roiSize = size(roiMidpoints, 1);
             errf = 10000;
             xf = 10000;
             yf = 10000;
             thf = 10000;
             numf = 10000;
             for i=1:roiSize
-                [x, y, th, err, num] = sailFinder.findLineCandidate(roiMidpoints(i), obj.maxLen);
+                [x, y, th, err, num] = sailFinder.findLineCandidate(roiMidpoints(i,:), obj.maxLen);
                 if err < errf
                     xf = x;
                     yf = y;
@@ -152,7 +164,6 @@ classdef mrplSystem
                     numf = num;
                 end
             end
-            
             % if nothing was found, loop again
             if xf == 10000
                 return
@@ -167,9 +178,12 @@ classdef mrplSystem
             xf = Pgr(1);
             yf = Pgr(2);
             thf = Pgr(3);
-        end
+            disp([xf, yf, thf]);
+        end 
         
-        function positionIdx = runRobot(obj, tau, feedBack, endPoint, positionIdx)
+        function obj = runRobot(obj, tau, feedBack, endPoint)
+            global robot;
+            global positionIdx;
             Two = obj.getWorldToOriginT();
             xf = endPoint(1);
             yf = endPoint(2);
@@ -238,13 +252,13 @@ classdef mrplSystem
             global currLeftEncoder;
             global currRightEncoder;
             global timestamp;
+            global positionIdx;
             
             frames = 0;
             timestamp = 0;
             robot = raspbot('RaspBot-16');
             robot.encoders.NewMessageFcn=@encoderEventListener;
             robot.startLaser();
-            pause(0.5);
             
             initLeftEncoder = currLeftEncoder;
             initRightEncoder = currRightEncoder;
@@ -263,7 +277,7 @@ classdef mrplSystem
             ylabel('y (meters)');
 
             positionIdx = 1;
-            tau = 5;
+            tau = 4.1281;
             feedBack = true;
 
             control = 0;
@@ -275,11 +289,11 @@ classdef mrplSystem
                 pause(0.05);
             end
             
-            obj.updateStateEst();
-            pause(3);
+            obj = obj.updateStateEst();
+            pause(5);
             robot.sendVelocity(0, 0);
-            i = 
-            while i < 4
+            i = 0;
+            while i < 3
                 laserData = robot.laser.LatestMessage.Ranges;
                 sailFinder = rangeImage(laserData, 1, true);
                 % returns Pgr, pose of goal to robot (not the actual
@@ -289,16 +303,18 @@ classdef mrplSystem
                 if xf == 10000
                     continue
                 end
-                
                 % plan and run the trajectory to the goal 
-                positionIdx = obj.runRobot(tau, feedBack, [xf, yf, thf], positionIdx);
+                obj = obj.runRobot(tau, feedBack, [xf, yf, thf]);
                 pause(1);
                 % now, get to pallet position and pick up
-                positionIdx = obj.runRobot(tau, feedBack, [0.02, 0, 0], positionIdx);
-                robot.forksUp();
+                % obj = obj.runRobot(tau, feedBack, [0.02, 0, 0]);
+                % robot.forksUp();
                 pause(2);
-                robot.forksDown();
-                pause(15);
+                % robot.forksDown();
+                if (i ~= 3)
+                    pause(15);
+                end
+                i = i + 1;
                 
 % The commented section should be handled by calling obj.runRobot(Two,
 % tau, endPose, positionIdx). Once confirmed to work, delete this section of code            
@@ -355,11 +371,12 @@ classdef mrplSystem
 %                 robot.stop();
                 
             end
+            robot.stopLaser();
             robot.stop();
             robot.shutdown();
             xErr = obj.refX(positionIdx - 1) - obj.realX(positionIdx - 1);
             yErr = obj.refY(positionIdx - 1) - obj.realY(positionIdx - 1);
-            display(sqrt(xErr*xErr + yErr*yErr));
+            % display(sqrt(xErr*xErr + yErr*yErr));
             obj = obj.truncArrays(positionIdx);
             obj.plotData();
         end

@@ -39,7 +39,7 @@ classdef trapezoidalReferenceControl
             obj.kv = 1;
             obj.Tf = obj.tf * obj.ks / obj.kv;
            
-            
+            % figure out what the real delay is but this should be ok
             obj.Tdelay = 0.2;
             obj.kp = 3;
             obj.ki = 0.0;
@@ -74,6 +74,7 @@ classdef trapezoidalReferenceControl
                 feedForward = obj.computeControl(currT);
                 currIdealPos = currIdealPos + feedForward * deltaT;
                 delayedFeedForward = obj.computeControl(currT - obj.Tdelay);
+                delayedCurrIdealPos = delayedCurrIdealPos + delayedFeedForward * deltaT;
                 obj.idealArr(count) = currIdealPos;
                 obj.delayedArr(count) = delayedCurrIdealPos;
                 obj.tArr(count) = currT;
