@@ -8,7 +8,8 @@ classdef mrplSystem
     properties(Constant)
         wheelbase = 0.09;
         Vref = 0.2;
-        Pgp = pose(-0.075, 0, 0);
+        %Pgp = pose(-0.075, 0, 0);
+        Pgp = pose(-0.15, 0, 0);
         % might need to be negative
         Psr = pose(0, 0, -0.0350);
         % 0.0337 specifically for Robit 16
@@ -277,7 +278,8 @@ classdef mrplSystem
             ylabel('y (meters)');
 
             positionIdx = 1;
-            tau = 4.1281;
+            %tau = 4.1281;
+            tau = 7;
             feedBack = true;
 
             control = 0;

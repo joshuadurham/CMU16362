@@ -28,7 +28,8 @@ classdef controller
             obj.tau = tau;
             obj.kx = 1/obj.tau/obj.Vref;
             obj.ky = 2/(obj.tau*obj.Vref).^2;
-            obj.kth = 2/obj.tau/obj.Vref;
+            %obj.kth = 2/obj.tau/obj.Vref;
+            obj.kth = 4/obj.tau/obj.Vref;
         end
         
         function [uV, uOmega] = error(obj)
