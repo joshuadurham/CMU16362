@@ -9,8 +9,7 @@ classdef rangeImage < handle
         %boundingRect = [0.0, 0.1, 0.20, -0.2];
         edgeWeights = 10;
         wallThresh = 1.5;
-        % [0.2, 0.3, 0.6, -0.6]
-        boundingRect = [0.2, 0.3, 0.4, -0.6];
+        boundingRect = [0.2, 0.3, 0.6, -0.6]
     end
     
     properties(Access = public)
@@ -143,7 +142,7 @@ classdef rangeImage < handle
                     candidateY(candidateIdx) = obj.yArray(i);
                     testBoxX(testBoxIdx) = obj.xArray(i);
                     testBoxY(testBoxIdx) = obj.yArray(i);
-                elseif sqrt((middleX - obj.xArray(i))^2 + (middleY - obj.yArray(i))^2) < (maxLen)
+                elseif sqrt((middleX - obj.xArray(i))^2 + (middleY - obj.yArray(i))^2) < (maxLen * 1.5)
                     testBoxIdx = testBoxIdx + 1;
                     testBoxX(testBoxIdx) = obj.xArray(i);
                     testBoxY(testBoxIdx) = obj.yArray(i);
@@ -243,9 +242,9 @@ classdef rangeImage < handle
                         %disp(err)
                     end
                     err = err / num / num;
-                    % scatter(candidateX, candidateY);
+                    scatter(candidateX, candidateY);
                     hold on 
-                    % scatter(xPos, yPos, 10000);
+                    scatter(xPos, yPos, 10000);
 %                      disp(err);
                 end
             end
