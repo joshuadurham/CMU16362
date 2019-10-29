@@ -116,6 +116,11 @@ classdef trapezoidalReferenceControl
             V = interp1(obj.tArr, obj.velArr, t);
         end
               
+        function pose = getPoseAtTime(obj, t)
+            pose = [0, 0, 0];
+            pose(1) = interp1(obj.tArr, obj.idealArr, t);
+        end
+        
         function w = getwAtTime(obj, t)
             w = 0;
         end

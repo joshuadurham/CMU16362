@@ -124,8 +124,13 @@ classdef rotationalReferenceControl
             V = 0;
         end
 
-        function V = getWAtTime(obj, t)
+        function V = getVAtTime(obj, t)
             V = 0;
+        end
+        
+        function pose = getPoseAtTime(obj, t)
+            pose = [0, 0, 0];
+            pose(3) = interp1(obj.tArr, obj.idealArr, t);
         end
               
         function w = getwAtTime(obj, t)

@@ -1,5 +1,5 @@
 % calibrate robot
-rb = raspbot('RaspBot-16');
+rb = raspbot('RaspBot-11');
 rb.startLaser();
 pause(5);
 laserData = rb.laser.LatestMessage.Ranges;

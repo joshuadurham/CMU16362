@@ -14,7 +14,7 @@ classdef mrplSystem
         % pose of the final position wrt to the acquisition position
         Pfp = pose(0.05, 0, 0);
         % might need to be negative
-        Psr = pose(0, 0, -0.0350);
+        Psr = pose(0, 0, -0.0357);
         % 0.0337 specifically for Robit 16
         maxLen = 0.13; % test for now
         arrLen = 2000;
@@ -175,6 +175,10 @@ classdef mrplSystem
             if xf == 10000
                 return
             end
+            disp("RANGEIMAGE VALUES");
+            disp(xf);
+            disp(yf);
+            disp(thf);
             % pose of pallet to sensor
             Pps = pose(xf, yf, thf);
             % transform of pallet to sensor
@@ -197,7 +201,7 @@ classdef mrplSystem
             thf = endPoint(3);
             
             if (lin)
-                obj.spline = trajectoryReferenceControl(obj.amax, obj.Vref, endPoint(1), sgn, 0);
+                obj.spline = trapezoidalReferenceControl(obj.amax, obj.Vref, endPoint(1), sgn, 0);
             elseif (ang)
                 obj.spline = rotationalReferenceControl(obj.amax, obj.Vref, endPoint(3), sgn, 0);
             else
@@ -250,6 +254,10 @@ classdef mrplSystem
                 [vl, vr] = robotModel.VwTovlvr(V, w);
                 positionIdx = positionIdx + 1;
 
+                if isnan(vl) || isnan(vr)
+                    vl = 0;
+                    vr = 0;
+                end
                 robot.sendVelocity(vl, vr);
                 pause(0.05);
             end
@@ -268,7 +276,7 @@ classdef mrplSystem
             
             frames = 0;
             timestamp = 0;
-            robot = raspbot('RaspBot-16');
+            robot = raspbot('RaspBot-11');
             robot.encoders.NewMessageFcn=@encoderEventListener;
             robot.startLaser();
             
@@ -289,8 +297,8 @@ classdef mrplSystem
             ylabel('y (meters)');
 
             positionIdx = 1;
-            tau = 4.1281;
-            feedBack = true;
+            tau = 5;
+            feedBack = false;
 
             control = 0;
             acPose = 0;
@@ -310,51 +318,55 @@ classdef mrplSystem
                 sailFinder = rangeImage(laserData, 1, true);
                 % returns Pgr, pose of goal to robot (not the actual
                 % pallet)
-                [xf, yf, thf] = obj.findSail(sailFinder);
+                [xf, yf, thf] = obj.findSail(sailFinder)
                 % if nothing was found, redo it
                 if xf == 10000
                     continue
                 end
                 % plan and run the trajectory to the acquisition pose
-                obj = obj.runRobot(tau, feedBack, [xf, yf, thf], false, false, 1);
+                obj = obj.runRobot(tau, true, [xf, yf, thf], false, false, 1);
                 pause(1);
                 
                 % go on straight line trajectory
                 [xf, yf, thf] = obj.findSail(sailFinder);
                 % position of goal to robot in acquisition pose, so ideally
                 % straight on
+%                 Pgr = pose(xf, yf, thf);
+%                 % transform of pallet to robot 
+%                 Tpr = Pgr.bToA / obj.Tgp;
+%                 % transform of ideal final (distance + 5 cm) to robot
+%                 Tfr = Tpr * obj.Tfp;
+%                 xf = 0.05;
+%                 if (thf > 0.1 || thf < -0.1)
+%                     if (thf > 0)
+%                         obj = obj.runRobot(tau, feedBack, [0, 0, abs(thf)], true, false, -1);
+%                     else
+%                         obj = obj.runRobot(tau, feedBack, [0, 0, abs(thf)], true, false, 1);
+%                     end
+%                 end    
+%                 
+                % assume straight line, if not then add in the small angle
+%                 [xf, yf, thf] = obj.findSail(sailFinder);
+                % movements
                 Pgr = pose(xf, yf, thf);
-                % transform of pallet to robot 
-                Tpr = Pgr.bToA / obj.Tgp;
-                % transform of ideal final (distance + 5 cm) to robot
-                Tfr = Tpr * obj.Tfp;
-                Pfr = pose.matToPoseVec(Tfr);
-                xf = Pfr(1);
-                thf = Pfr(3);
+                Tar = Pgr.bToA / Tgp;
                 
-                % if straight line
-                obj = obj.runRobot(tau, feedBack, [xf, 0, 0], false, true, 1);
+
+                obj = obj.runRobot(tau, feedBack, [xf, yf, thf], false, true, 1);
                 pause(1);
                 robot.forksUp();
                 pause(1);
                 robot.forksDown();
                 pause(1);
                 % back up 5 cm
-                xf = obj.Pfp(1);
+                xf = 0.05;
                 obj = obj.runRobot(tau, feedBack, [xf, 0, 0], false, true, -1);
-                pause(1);
+                % spin around
                 thf = pi;
-                obj.runRobot(tau, feedBack, [0
-                % robot.forksUp();
-                pause(2);
+                obj = obj.runRobot(tau, feedBack, [0, 0, thf], true, false, 1);
                 % robot.forksDown();
-                if (i ~= 3)
-                    pause(15);
-                end
+                pause(10);
                 i = i + 1;
-                
-
-                
             end
             robot.stopLaser();
             robot.stop();

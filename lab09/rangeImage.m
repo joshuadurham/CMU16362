@@ -8,7 +8,7 @@ classdef rangeImage < handle
         % [x, y, w, h]
         %boundingRect = [0.0, 0.1, 0.20, -0.2];
         edgeWeights = 10;
-        wallThresh = 1.25;
+        wallThresh = 1.5;
         boundingRect = [0.2, 0.3, 0.6, -0.6]
     end
     
@@ -119,8 +119,8 @@ classdef rangeImage < handle
             % of pixels participating, and the angle of the line relative
             % to the sensor
             numPtsThresh = 5;
-            eigThresh = 25;
-            lengthDiffThresh = 5;
+            eigThresh = 2.3;
+            lengthDiffThresh = 0.2;
             testBoxX = zeros(1, size(obj.rArray, 2));
             testBoxY = zeros(1, size(obj.rArray, 2));
             candidateR = zeros(1, size(obj.rArray, 2));
@@ -163,18 +163,27 @@ classdef rangeImage < handle
                 y = candidateY(1:candidateIdx);
                 xTest = testBoxX(1:testBoxIdx);
                 yTest = testBoxY(1:testBoxIdx);
-                Ixx = x * x';
-                Iyy = y * y';
-                Ixy = -x * y';
-                Testxx = xTest * xTest';
-                Testyy = yTest * yTest';
-                Testxy = -xTest * yTest';
+                xMean = mean(x);
+                yMean = mean(y);
+                xTestMean = mean(xTest);
+                yTestMean = mean(yTest);
+                xTestIner = xTest - xTestMean;
+                yTestIner = yTest - yTestMean;
+                xIner = x - xMean;
+                yIner = y - yMean;
+                Ixx = xIner * xIner';
+                Iyy = yIner * yIner';
+                Ixy = -xIner * yIner';
+                Testxx = xTestIner * xTestIner';
+                Testyy = yTestIner * yTestIner';
+                Testxy = -xTestIner * yTestIner';
                 
-                testInertia = [Testxx Testxy; Testxy Testyy] ./ testIdx;
+                testInertia = [Testxx Testxy; Testxy Testyy] / testBoxIdx;
                 inertia = [Ixx Ixy; Ixy Iyy] / candidateIdx; %normalized
                 testLambda = eig(testInertia);
                 lambda = eig(inertia);
-                
+%                 testBoxIdx
+%                 candidateIdx
                    
                 lambda = sqrt(lambda) * 1000.0;
             
@@ -185,7 +194,16 @@ classdef rangeImage < handle
 
                 boundingLen = sqrt((maxX - minX)^2 + (maxY - minY)^2);
 
-                if candidateIdx < numPtsThresh || lambda(1) >= eigThresh || boundingLen > (1 + lengthDiffThresh) * maxLen || boundingLen < (1 - lengthDiffThresh) * maxLen || testLambda(1) / lambda(1) < obj.wallThresh && candidateIdx ~= testBoxIdx
+                if (candidateIdx < numPtsThresh || lambda(1) >= eigThresh || ...
+                        boundingLen > (1 + lengthDiffThresh) * maxLen || ...
+                        boundingLen < (1 - lengthDiffThresh) * maxLen || ...
+                        abs(testLambda(1) - lambda(1)) < obj.wallThresh * lambda(1)) && ...
+                        candidateIdx ~= testBoxIdx
+                    disp("FAILING ERRORS BELOW");
+                    disp(lambda(1));
+                    disp(boundingLen);
+                    disp(testLambda(1));
+                    disp(candidateIdx);
                     xPos = 0;
                     yPos = 0;
                     err = 100000000;
@@ -195,24 +213,10 @@ classdef rangeImage < handle
                     xPos = mean(x);
                     yPos = mean(y);
                     th = atan2(2 * Ixy, Iyy - Ixx)/2.0;
-                    if (th < pi/2)
-%                         disp("ADDING PI/2")
-                        th = th - (pi/2);
-                    else 
-%                         disp("SUBTRACTING FROM PI/2")
-                        th = (pi/2) - th;
-                    end
-                    if (th < -pi/2) 
-                        th = th + pi;
-                    end
-                    if (th > pi/2)
-                        th = th - pi;
-                    end
-                    % disp("FINAL THETA HERE");
                     num = candidateIdx;
                     perpTh = th + (pi/2);
                     %slope = tan(perpTh);
-                    slope = tan(th);
+                    slope = tan(perpTh);
                     %disp("SLOPE")
                     %disp(slope)
                     err = 0;
@@ -230,6 +234,11 @@ classdef rangeImage < handle
                         %disp("ERR")
                         %disp(err)
                     end
+                    err = err / num / num;
+                    scatter(candidateX, candidateY);
+                    hold on 
+                    scatter(xPos, yPos, 10000);
+                    disp(err);
                 end
             end
         end

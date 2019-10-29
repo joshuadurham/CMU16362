@@ -48,7 +48,7 @@ classdef controller
             uOmega = obj.ky*ey+obj.kth*eth;
         end
         
-        function [uOmega] = turningError(obj)
+        function [uv, uOmega] = turningError(obj)
             errVec = pose.matToPoseVec(obj.Trp);
             eth = errVec(3);
             % not sure if next line is necessary but hey why not
@@ -60,6 +60,7 @@ classdef controller
                 eth = -thLimit;
             end
             uOmega = obj.kth*eth;
+            uv = 0;
         end
         
         function realPose = getRealPose(obj)
