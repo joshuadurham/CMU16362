@@ -7,7 +7,10 @@ classdef rangeImage < handle
         maxRangeForTarget = 1.0;
         % [x, y, w, h]
         %boundingRect = [0.0, 0.1, 0.20, -0.2];
-        boundingRect = [0.2, 0.3, 0.6, -0.6]
+        edgeWeights = 10;
+        wallThresh = 1.5;
+        % [0.2, 0.3, 0.6, -0.6]
+        boundingRect = [0.2, 0.3, 0.6, -0.6];
     end
     
     properties(Access = public)
@@ -117,25 +120,37 @@ classdef rangeImage < handle
             % of pixels participating, and the angle of the line relative
             % to the sensor
             numPtsThresh = 5;
-            eigThresh = 25;
-            lengthDiffThresh = 5;
+            eigThresh = 2.3;
+            lengthDiffThresh = 0.2;
+            testBoxX = zeros(1, size(obj.rArray, 2));
+            testBoxY = zeros(1, size(obj.rArray, 2));
             candidateR = zeros(1, size(obj.rArray, 2));
             candidateT = zeros(1, size(obj.tArray, 2));
             candidateX = zeros(1, size(obj.xArray, 2));
             candidateY = zeros(1, size(obj.yArray, 2));
             candidateIdx = 0;
+            testBoxIdx = 0;
             middleX = middle(1);
             middleY = middle(2);
             for i=1:size(obj.rArray,2)
                 % filter out the points not in the bounding box
                 if sqrt((middleX - obj.xArray(i))^2 + (middleY - obj.yArray(i))^2) < (maxLen / 2)
                     candidateIdx = candidateIdx + 1;
+                    testBoxIdx = testBoxIdx + 1;
                     candidateR(candidateIdx) = obj.rArray(i);
                     candidateT(candidateIdx) = obj.tArray(i);
                     candidateX(candidateIdx) = obj.xArray(i);
                     candidateY(candidateIdx) = obj.yArray(i);
+                    testBoxX(testBoxIdx) = obj.xArray(i);
+                    testBoxY(testBoxIdx) = obj.yArray(i);
+                elseif sqrt((middleX - obj.xArray(i))^2 + (middleY - obj.yArray(i))^2) < (maxLen)
+                    testBoxIdx = testBoxIdx + 1;
+                    testBoxX(testBoxIdx) = obj.xArray(i);
+                    testBoxY(testBoxIdx) = obj.yArray(i);
                 end
             end
+            % filter if not enough candidate points or the line is too long
+            % (wall)
             if candidateIdx == 0
                 xPos = 0;
                 yPos = 0;
@@ -147,15 +162,31 @@ classdef rangeImage < handle
                 t = candidateT(1:candidateIdx);
                 x = candidateX(1:candidateIdx);
                 y = candidateY(1:candidateIdx);
+                xTest = testBoxX(1:testBoxIdx);
+                yTest = testBoxY(1:testBoxIdx);
                 xMean = mean(x);
                 yMean = mean(y);
+                xTestMean = mean(xTest);
+                yTestMean = mean(yTest);
+                xTestIner = xTest - xTestMean;
+                yTestIner = yTest - yTestMean;
                 xIner = x - xMean;
                 yIner = y - yMean;
                 Ixx = xIner * xIner';
                 Iyy = yIner * yIner';
                 Ixy = -xIner * yIner';
+                Testxx = xTestIner * xTestIner';
+                Testyy = yTestIner * yTestIner';
+                Testxy = -xTestIner * yTestIner';
+                
+                testInertia = [Testxx Testxy; Testxy Testyy] / testBoxIdx;
                 inertia = [Ixx Ixy; Ixy Iyy] / candidateIdx; %normalized
+                testLambda = eig(testInertia);
+                testLambda = sqrt(testLambda) * 1000.0;
                 lambda = eig(inertia);
+%                 testBoxIdx
+%                 candidateIdx
+                   
                 lambda = sqrt(lambda) * 1000.0;
             
                 maxX = max(x);
@@ -165,38 +196,39 @@ classdef rangeImage < handle
 
                 boundingLen = sqrt((maxX - minX)^2 + (maxY - minY)^2);
 
-                if candidateIdx < numPtsThresh || lambda(1) >= eigThresh || boundingLen > (1 + lengthDiffThresh) * maxLen || boundingLen < (1 - lengthDiffThresh) * maxLen
+                if (candidateIdx < numPtsThresh || lambda(1) >= eigThresh || ...
+                        boundingLen > (1 + lengthDiffThresh) * maxLen || ...
+                        boundingLen < (1 - lengthDiffThresh) * maxLen || ...
+                        sqrt(testLambda(1)^2 - lambda(1)^2) < obj.wallThresh) && ...
+                        candidateIdx ~= testBoxIdx
+%                     disp("FAILING ERRORS BELOW");
+%                     disp(lambda(1));
+%                     disp(boundingLen);
+%                     disp(testLambda(1));
+%                     disp(candidateIdx);
                     xPos = 0;
                     yPos = 0;
                     err = 100000000;
                     num = 0;
                     th = 0;
                 else
+                    disp("Succ");
+                    disp(lambda(1));
+                    disp(boundingLen);
+                    disp(testLambda(1));
+                    disp(testBoxIdx);
+                    disp(candidateIdx);
                     xPos = mean(x);
                     yPos = mean(y);
                     th = atan2(2 * Ixy, Iyy - Ixx)/2.0;
-                    %if (th < pi/2)
-%                         disp("ADDING PI/2")
-                    %    th = th - (pi/2);
-                    %else 
-%                         disp("SUBTRACTING FROM PI/2")
-                    %    th = (pi/2) - th;
-                    %end
-                    %if (th < -pi/2) 
-                    %    th = th + pi;
-                    %end
-                    %if (th > pi/2)
-                    %    th = th - pi;
-                    %end
-                    % disp("FINAL THETA HERE");
-                    %th;
                     num = candidateIdx;
                     perpTh = th + (pi/2);
                     %slope = tan(perpTh);
-                    slope = tan(th);
+                    slope = tan(perpTh);
                     %disp("SLOPE")
                     %disp(slope)
                     err = 0;
+                    % Filters out things of more than 13 pixels
                     for i=1:num
                         expectedY = slope*candidateX(i) - slope*xPos + yPos;
                         %disp("CANDIDATE X_I")
@@ -210,13 +242,13 @@ classdef rangeImage < handle
                         %disp("ERR")
                         %disp(err)
                     end
-                    err = err / num;
-                    scatter(candidateX, candidateY);
-                    pause(2);
-                    disp(err);
+                    err = err / num / num;
+                    % scatter(candidateX, candidateY);
+                    hold on 
+                    % scatter(xPos, yPos, 10000);
+%                      disp(err);
                 end
             end
-            th;
         end
         
         function num = numPixels(obj)
