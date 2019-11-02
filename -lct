@@ -1,0 +1,861 @@
+[33mcommit 4491e0927331a5bfde64a78ba69c4a2134515f7b[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Brandon Hung <brandonhung343@gmail.com>
+Date:   Mon Oct 28 18:57:25 2019 -0400
+
+    First test. Fixed up the main loop
+
+[1mdiff --git a/lab09/mrplSystem.asv b/lab09/mrplSystem.asv[m
+[1mnew file mode 100644[m
+[1mindex 0000000..001597e[m
+[1m--- /dev/null[m
+[1m+++ b/lab09/mrplSystem.asv[m
+[36m@@ -0,0 +1,374 @@[m
+[32m+[m[32mclassdef mrplSystem[m
+[32m+[m[32m    % Sub out the main loop when you want to run something[m
+[32m+[m[32m    % Useful coordinate transforms are included[m
+[32m+[m[32m    % Variable coordinate transform convention is Txy, where[m
+[32m+[m[32m    % x is relative to y. For example, Twr is transform of the world[m
+[32m+[m[32m    % relative to the robot[m
+[32m+[m[41m    [m
+[32m+[m[32m    properties(Constant)[m
+[32m+[m[32m        wheelbase = 0.09;[m
+[32m+[m[32m        Vref = 0.2;[m
+[32m+[m[32m        % pose of goal to pallet[m
+[32m+[m[32m        Pgp = pose(-0.15, 0, 0);[m
+[32m+[m[32m        % pose of acquisition position to goal[m
+[32m+[m[32m        % pose of the final position wrt to the acquisition position[m
+[32m+[m[32m        Pfp = pose(0.05, 0, 0);[m
+[32m+[m[32m        % might need to be negative[m
+[32m+[m[32m        Psr = pose(0, 0, -0.0350);[m
+[32m+[m[32m        % 0.0337 specifically for Robit 16[m
+[32m+[m[32m        maxLen = 0.13; % test for now[m
+[32m+[m[32m        arrLen = 2000;[m
+[32m+[m[32m        amax = 0.1;[m
+[32m+[m[32m    end[m
+[32m+[m[41m    [m
+[32m+[m[32m    properties[m
+[32m+[m[32m        endpoints[m
+[32m+[m[32m        estRobot[m
+[32m+[m[32m        refX[m
+[32m+[m[32m        refY[m
+[32m+[m[32m        refTh[m
+[32m+[m[32m        realX[m
+[32m+[m[32m        realY[m
+[32m+[m[32m        realTh[m
+[32m+[m[32m        spline[m
+[32m+[m[32m        Tgp[m
+[32m+[m[32m        Tfp[m
+[32m+[m[32m        Tsr[m
+[32m+[m[32m    end[m
+[32m+[m[41m    [m
+[32m+[m[32m    methods[m
+[32m+[m[32m        function obj = mrplSystem(endpoints)[m
+[32m+[m[32m            % endpoints: absolute world coordinates of where[m[41m [m
+[32m+[m[32m            % we want to end up, first row always 0, 0, 0;[m[41m [m
+[32m+[m[32m            % ex. endpoints = [0,      0,      0;[m
+[32m+[m[32m            %          0.3048, 0.3048, 0.0;[m
+[32m+[m[32m            %         -0.3048, -0.3048, - pi()/2.0;[m
+[32m+[m[32m            %         -0.6096, 0, 0];[m
+[32m+[m[32m            if (nargin == 1)[m
+[32m+[m[32m                obj.endpoints = endpoints;[m
+[32m+[m[32m            else[m
+[32m+[m[32m                obj.endpoints = [0, 0, 0];[m
+[32m+[m[32m            end[m[41m [m
+[32m+[m[32m            % estBot: odometry/estimated state of the robot[m
+[32m+[m[32m            obj.estRobot = estRobot(obj.wheelbase);[m
+[32m+[m[32m            % state estimated arrays of data[m
+[32m+[m[32m            obj.realX = zeros(1, obj.arrLen);[m
+[32m+[m[32m            obj.realY = zeros(1, obj.arrLen);[m
+[32m+[m[32m            obj.realTh = zeros(1, obj.arrLen);[m
+[32m+[m[32m            % reference arrays of data[m
+[32m+[m[32m            obj.refX = zeros(1, obj.arrLen);[m
+[32m+[m[32m            obj.refY = zeros(1, obj.arrLen);[m
+[32m+[m[32m            obj.refTh = zeros(1, obj.arrLen);[m
+[32m+[m[32m            obj.spline = 0;[m
+[32m+[m[32m            obj.Tgp = obj.Pgp.bToA;[m
+[32m+[m[32m            obj.Tsr = obj.Psr.bToA;[m
+[32m+[m[32m            obj.Tfp = obj.Pfp.bToA;[m
+[32m+[m[32m        end[m
+[32m+[m[41m        [m
+[32m+[m[32m        function [V, w] = useFeedback(obj, refPose, acPose, tau, currT, ang, lin)[m
+[32m+[m[32m            % compute the controller with properly adjusted coordinates[m
+[32m+[m[32m            control = controller(refPose, acPose, obj.Vref, tau);[m
+[32m+[m[32m            % produce trajectory follower[m
+[32m+[m[32m            follow = trajectoryFollower(obj.spline, control);[m
+[32m+[m[32m            [V, w] = follow.getRealVw(currT, ang, lin);[m[41m [m
+[32m+[m[32m        end[m
+[32m+[m[41m        [m
+[32m+[m[32m        function Two = getWorldToOriginT(obj)[m
+[32m+[m[32m            % use for this lab, pass in origin posefor[m[41m [m
+[32m+[m[32m            % transform of world wrt robot origin[m
+[32m+[m[32m            [ox, oy, oth] = obj.estRobot.getRobotPose();[m
+[32m+[m[32m            originPose = pose(ox, oy, oth);[m
+[32m+[m[32m            Two = originPose.aToB();[m
+[32m+[m[32m        end[m
+[32m+[m[41m        [m
+[32m+[m[32m        function [xf, yf, thf, Two] = getEndpointToOriginPoint(obj, pointNumber)[m
+[32m+[m[32m            % irrelevant for this lab, as[m[41m [m
+[32m+[m[32m            % instead of the absolute world coordinates, simply use the[m[41m [m
+[32m+[m[32m            % robot as the origin and plan individual trajectories from[m
+[32m+[m[32m            % passing in the origin pose and final pose[m
+[32m+[m[32m            i = pointNumber;[m
+[32m+[m[32m            % transform of world wrt robot origin[m
+[32m+[m[32m            origin = obj.endpoints(i-1, :);[m
+[32m+[m[32m            ox = origin(1);[m
+[32m+[m[32m            oy = origin(2);[m
+[32m+[m[32m            oth = origin(3);[m
+[32m+[m[32m            originPose = pose(ox, oy, oth);[m
+[32m+[m[32m            Two = originPose.aToB();[m
+[32m+[m
+[32m+[m[32m            % transform of endpoint wrt world[m
+[32m+[m[32m            nextPoint = obj.endpoints(i, :);[m
+[32m+[m[32m            nextX = nextPoint(1);[m
+[32m+[m[32m            nextY = nextPoint(2);[m
+[32m+[m[32m            nextTh = nextPoint(3);[m
+[32m+[m[32m            nextPose = pose(nextX, nextY, nextTh);[m
+[32m+[m[32m            Tew = nextPose.bToA();[m
+[32m+[m
+[32m+[m[32m            % transform of endpoints wrt robot origin[m
+[32m+[m[32m            Teo = Two * Tew;[m
+[32m+[m[32m            endToRobotPose = pose.matToPoseVec(Teo);[m
+[32m+[m[32m            xf = endToRobotPose(1);[m
+[32m+[m[32m            yf = endToRobotPose(2);[m
+[32m+[m[32m            thf = endToRobotPose(3);[m
+[32m+[m[32m        end[m
+[32m+[m[41m        [m
+[32m+[m[32m        function [relx, rely, relth] = getReferenceToWorldPose(obj, currT, Two)[m
+[32m+[m[32m            % coordinates of reference wrt path origin[m
+[32m+[m[32m            robToOriginCoords = obj.spline.getPoseAtTime(currT);[m
+[32m+[m[32m            robToOriginPose = pose(robToOriginCoords(1), robToOriginCoords(2), robToOriginCoords(3));[m
+[32m+[m[32m            Tro = robToOriginPose.bToA;[m
+[32m+[m
+[32m+[m[32m            % coordinates of reference wrt world[m
+[32m+[m[32m            % finds inverse of ref to origin * origin to world[m[41m [m
+[32m+[m[32m            Trw = Two\Tro;[m
+[32m+[m[32m            relPose = pose.matToPoseVec(Trw);[m
+[32m+[m[32m            relx = relPose(1);[m
+[32m+[m[32m            rely = relPose(2);[m
+[32m+[m[32m            relth = relPose(3);[m
+[32m+[m[32m        end[m
+[32m+[m[41m        [m
+[32m+[m[32m        function obj = truncArrays(obj, positionIdx)[m
+[32m+[m[32m            obj.refX = obj.refX(1, 1:positionIdx-1);[m
+[32m+[m[32m            obj.refY = obj.refY(1, 1:positionIdx-1);[m
+[32m+[m[32m            obj.refTh = obj.refTh(1, 1:positionIdx-1);[m
+[32m+[m[32m            obj.realX = obj.realX(1, 1:positionIdx-1);[m
+[32m+[m[32m            obj.realY = obj.realY(1, 1:positionIdx-1);[m
+[32m+[m[32m            obj.realTh = obj.realTh(1, 1:positionIdx-1);[m
+[32m+[m[32m        end[m
+[32m+[m[41m        [m
+[32m+[m[32m        function obj = updateStateEst(obj)[m
+[32m+[m[32m            [left, right, ~] = estRobot.getEncData();[m
+[32m+[m[32m            obj.estRobot = obj.estRobot.updatePosition(left, right);[m
+[32m+[m[32m        end[m
+[32m+[m[41m        [m
+[32m+[m[32m        function plotData(obj)[m
+[32m+[m[32m            clf;[m
+[32m+[m[32m            hold on;[m
+[32m+[m[32m            xlabel('Robot X (meters)');[m
+[32m+[m[32m            ylabel('Robot Y (meters)');[m
+[32m+[m[32m            title('First Section');[m
+[32m+[m[32m            plot(obj.refX, obj.refY);[m
+[32m+[m[32m            plot(obj.realX, obj.realY);[m
+[32m+[m[32m            legend({'Reference Path', 'Robot Path'});[m
+[32m+[m[32m        end[m
+[32m+[m[41m        [m
+[32m+[m[32m        % sets up finding the position of the sail before driving into it[m
+[32m+[m[32m        function [xf, yf, thf, errf, numf] = findSail(obj, sailFinder)[m
+[32m+[m[32m            roiMidpoints = sailFinder.roiFilter();[m
+[32m+[m[32m            roiMidpoints = roiMidpoints';[m
+[32m+[m[32m            roiSize = size(roiMidpoints, 1);[m
+[32m+[m[32m            errf = 10000;[m
+[32m+[m[32m            xf = 10000;[m
+[32m+[m[32m            yf = 10000;[m
+[32m+[m[32m            thf = 10000;[m
+[32m+[m[32m            numf = 10000;[m
+[32m+[m[32m            for i=1:roiSize[m
+[32m+[m[32m                [x, y, th, err, num] = sailFinder.findLineCandidate(roiMidpoints(i,:), obj.maxLen);[m
+[32m+[m[32m                if err < errf[m
+[32m+[m[32m                    xf = x;[m
+[32m+[m[32m                    yf = y;[m
+[32m+[m[32m                    thf = th;[m
+[32m+[m[32m                    errf = err;[m
+[32m+[m[32m                    numf = num;[m
+[32m+[m[32m                end[m
+[32m+[m[32m            end[m
+[32m+[m[32m            % if nothing was found, loop again[m
+[32m+[m[32m            if xf == 10000[m
+[32m+[m[32m                return[m
+[32m+[m[32m            end[m
+[32m+[m[32m            % pose of pallet to sensor[m
+[32m+[m[32m            Pps = pose(xf, yf, thf);[m
+[32m+[m[32m            % transform of pallet to sensor[m
+[32m+[m[32m            Tps = Pps.bToA;[m
+[32m+[m[32m            % transform of acquisition position to robot[m
+[32m+[m[32m            Tgr = obj.Tsr * Tps * obj.Tgp;[m
+[32m+[m[32m            Pgr = pose.matToPoseVec(Tgr);[m
+[32m+[m[32m            xf = Pgr(1);[m
+[32m+[m[32m            yf = Pgr(2);[m
+[32m+[m[32m            thf = Pgr(3);[m
+[32m+[m[32m            disp([xf, yf, thf]);[m
+[32m+[m[32m        end[m[41m [m
+[32m+[m[41m        [m
+[32m+[m[32m        function obj = runRobot(obj, tau, feedBack, endPoint, ang, lin, sgn)[m
+[32m+[m[32m            global robot;[m
+[32m+[m[32m            global positionIdx;[m
+[32m+[m[32m            Two = obj.getWorldToOriginT();[m
+[32m+[m[32m            xf = endPoint(1);[m
+[32m+[m[32m            yf = endPoint(2);[m
+[32m+[m[32m            thf = endPoint(3);[m
+[32m+[m[41m            [m
+[32m+[m[32m            if (lin)[m
+[32m+[m[32m                obj.spline = trajectoryReferenceControl(obj.amax, obj.Vref, endPoint(1), sgn, 0);[m
+[32m+[m[32m            elseif (ang)[m
+[32m+[m[32m                obj.spline = rotationalReferenceControl(obj.amax, obj.Vref, endPoint(3), sgn, 0);[m
+[32m+[m[32m            else[m
+[32m+[m[32m                obj.spline = cubicSpiral.planTrajectory(xf, yf, thf, sgn);[m
+[32m+[m[32m                obj.spline.planVelocities(obj.Vref);[m
+[32m+[m[32m            end[m
+[32m+[m[41m            [m
+[32m+[m[32m            % pushes the robot on the actual trajectory[m
+[32m+[m[32m            dur = obj.spline.getTrajectoryDuration();[m
+[32m+[m
+[32m+[m[32m            currT = 0;[m
+[32m+[m[32m            firstIteration = false;[m
+[32m+[m
+[32m+[m[32m            while(currT < dur)[m
+[32m+[m[32m                if(firstIteration == false)[m
+[32m+[m[32m                    startTic = tic();[m[41m        [m
+[32m+[m[32m                    firstIteration = true;[m
+[32m+[m[32m                    continue;[m
+[32m+[m[32m                end[m
+[32m+[m
+[32m+[m[32m                % update our state estimation[m
+[32m+[m[32m                obj = obj.updateStateEst();[m
+[32m+[m
+[32m+[m[32m                % clock time[m
+[32m+[m[32m                currT = toc(startTic);[m
+[32m+[m
+[32m+[m[32m                % get goal position[m
+[32m+[m[32m                [relx, rely, relth] = obj.getReferenceToWorldPose(currT, Two);[m
+[32m+[m[32m                obj.refX(1, positionIdx) = relx;[m
+[32m+[m[32m                obj.refY(1, positionIdx) = rely;[m
+[32m+[m[32m                obj.refTh(1, positionIdx) = relth;[m
+[32m+[m
+[32m+[m[32m                % get state estimation[m
+[32m+[m[32m                [xReal, yReal, thReal] = obj.estRobot.getRobotPose();[m
+[32m+[m[32m                obj.realX(1, positionIdx) = xReal;[m
+[32m+[m[32m                obj.realY(1, positionIdx) = yReal;[m
+[32m+[m[32m                obj.realTh(1, positionIdx) = thReal;[m
+[32m+[m
+[32m+[m[32m                % get reference velocities[m
+[32m+[m[32m                V = obj.spline.getVAtTime(currT);[m
+[32m+[m[32m                w = obj.spline.getwAtTime(currT);[m
+[32m+[m
+[32m+[m[32m                if (feedBack)[m
+[32m+[m[32m                    % compute the controller with properly adjusted coordinates[m
+[32m+[m[32m                    refPose = pose(relx, rely, relth);[m
+[32m+[m[32m                    acPose = pose(xReal, yReal, thReal);[m
+[32m+[m[32m                    [V, w] = obj.useFeedback(refPose, acPose, tau, currT, ang, lin);[m
+[32m+[m[32m                end[m
+[32m+[m
+[32m+[m[32m                [vl, vr] = robotModel.VwTovlvr(V, w);[m
+[32m+[m[32m                positionIdx = positionIdx + 1;[m
+[32m+[m
+[32m+[m[32m                robot.sendVelocity(vl, vr);[m
+[32m+[m[32m                pause(0.05);[m
+[32m+[m[32m            end[m
+[32m+[m[32m            robot.stop();[m
+[32m+[m[32m        end[m
+[32m+[m[41m                [m
+[32m+[m[32m        function obj = executeTrajectory(obj)[m
+[32m+[m[32m            % lab06 loop[m
+[32m+[m[32m            % have to manually clear all now[m
+[32m+[m[32m            global robot;[m
+[32m+[m[32m            global frames;[m
+[32m+[m[32m            global currLeftEncoder;[m
+[32m+[m[32m            global currRightEncoder;[m
+[32m+[m[32m            global timestamp;[m
+[32m+[m[32m            global positionIdx;[m
+[32m+[m[41m            [m
+[32m+[m[32m            frames = 0;[m
+[32m+[m[32m            timestamp = 0;[m
+[32m+[m[32m            robot = raspbot('RaspBot-16');[m
+[32m+[m[32m            robot.encoders.NewMessageFcn=@encoderEventListener;[m
+[32m+[m[32m            robot.startLaser();[m
+[32m+[m[41m            [m
+[32m+[m[32m            initLeftEncoder = currLeftEncoder;[m
+[32m+[m[32m            initRightEncoder = currRightEncoder;[m
+[32m+[m[32m            initTime = timestamp;[m
+[32m+[m[41m            [m
+[32m+[m[32m            % set baseline for state estimator[m
+[32m+[m[32m            obj.estRobot.initLeftEncoder = initLeftEncoder;[m
+[32m+[m[32m            obj.estRobot.initRightEncoder = initRightEncoder;[m
+[32m+[m[32m            obj.estRobot.lastTime = initTime;[m
+[32m+[m[41m            [m
+[32m+[m
+[32m+[m[32m            xlim([-0.6 0.6]);[m
+[32m+[m[32m            ylim([-0.6 0.6]);[m
+[32m+[m[32m            title('Path of Robot');[m
+[32m+[m[32m            xlabel('x (meters)');[m
+[32m+[m[32m            ylabel('y (meters)');[m
+[32m+[m
+[32m+[m[32m            positionIdx = 1;[m
+[32m+[m[32m            tau = 4.1281;[m
+[32m+[m[32m            feedBack = true;[m
+[32m+[m
+[32m+[m[32m            control = 0;[m
+[32m+[m[32m            acPose = 0;[m
+[32m+[m[32m            refPose = 0;[m
+[32m+[m[32m            follow = 0;[m
+[32m+[m
+[32m+[m[32m            while(frames < 5)[m
+[32m+[m[32m                pause(0.05);[m
+[32m+[m[32m            end[m
+[32m+[m[41m            [m
+[32m+[m[32m            obj = obj.updateStateEst();[m
+[32m+[m[32m            pause(5);[m
+[32m+[m[32m            robot.sendVelocity(0, 0);[m
+[32m+[m[32m            i = 0;[m
+[32m+[m[32m            while i < 3[m
+[32m+[m[32m                laserData = robot.laser.LatestMessage.Ranges;[m
+[32m+[m[32m                sailFinder = rangeImage(laserData, 1, true);[m
+[32m+[m[32m                % returns Pgr, pose of goal to robot (not the actual[m
+[32m+[m[32m                % pallet)[m
+[32m+[m[32m                [xf, yf, thf] = obj.findSail(sailFinder);[m
+[32m+[m[32m                % if nothing was found, redo it[m
+[32m+[m[32m                if xf == 10000[m
+[32m+[m[32m                    continue[m
+[32m+[m[32m                end[m
+[32m+[m[32m                % plan and run the trajectory to the acquisition pose[m
+[32m+[m[32m                obj = obj.runRobot(tau, feedBack, [xf, yf, thf], false, false, 1);[m
+[32m+[m[32m                pause(1);[m
+[32m+[m[41m                [m
+[32m+[m[32m                % go on straight line trajectory[m
+[32m+[m[32m                [xf, yf, thf] = obj.findSail(sailFinder);[m
+[32m+[m[32m                % position of goal to robot in acquisition pose, so ideally[m
+[32m+[m[32m                % straight on[m
+[32m+[m[32m                Pgr = pose(xf, yf, thf);[m
+[32m+[m[32m                % transform of pallet to robot[m[41m [m
+[32m+[m[32m                Tpr = Pgr.bToA / obj.Tgp;[m
+[32m+[m[32m                % transform of ideal final (distance + 5 cm) to robot[m
+[32m+[m[32m                Tfr = Tpr * obj.Tfp;[m
+[32m+[m[32m                Pfr = pose.matToPoseVec(Tfr);[m
+[32m+[m[32m                xf = Pfr(1);[m
+[32m+[m[32m                thf = Pfr(3);[m
+[32m+[m[41m                [m
+[32m+[m[32m                % if straight line[m
+[32m+[m[32m                obj = obj.runRobot(tau, feedBack, [xf, 0, 0], false, true, 1);[m
+[32m+[m[32m                pause(1);[m
+[32m+[m[32m                robot.forksUp();[m
+[32m+[m[32m                pause(1);[m
+[32m+[m[32m                robot.forksDown();[m
+[32m+[m[32m                pause(1);[m
+[32m+[m[32m                % back up 5 cm[m
+[32m+[m[32m                xf = obj.Pfp(1);[m
+[32m+[m[32m                obj = obj.runRobot(tau, feedBack, [xf, 0, 0], false, true, -1);[m
+[32m+[m[32m                pause(1);[m
+[32m+[m[32m                thf = pi;[m
+[32m+[m[32m                obj.runRobot(tau, feedBack, [0[m
+[32m+[m[32m                % robot.forksUp();[m
+[32m+[m[32m                pause(2);[m
+[32m+[m[32m                % robot.forksDown();[m
+[32m+[m[32m                if (i ~= 3)[m
+[32m+[m[32m                    pause(15);[m
+[32m+[m[32m                end[m
+[32m+[m[32m                i = i + 1;[m
+[32m+[m[41m                [m
+[32m+[m
+[32m+[m[41m                [m
+[32m+[m[32m            end[m
+[32m+[m[32m            robot.stopLaser();[m
+[32m+[m[32m            robot.stop();[m
+[32m+[m[32m            robot.shutdown();[m
+[32m+[m[32m            xErr = obj.refX(positionIdx - 1) - obj.realX(positionIdx - 1);[m
+[32m+[m[32m            yErr = obj.refY(positionIdx - 1) - obj.realY(positionIdx - 1);[m
+[32m+[m[32m            % display(sqrt(xErr*xErr + yErr*yErr));[m
+[32m+[m[32m            obj = obj.truncArrays(positionIdx);[m
+[32m+[m[32m            obj.plotData();[m
+[32m+[m[32m        end[m
+[32m+[m[41m        [m
+[32m+[m[32m    end[m
+[32m+[m[41m    [m
+[32m+[m[32mend[m
+[32m+[m
+[32m+[m[41m           [m
+[32m+[m
+[1mdiff --git a/lab09/mrplSystem.m b/lab09/mrplSystem.m[m
+[1mindex e768c37..2299c93 100644[m
+[1m--- a/lab09/mrplSystem.m[m
+[1m+++ b/lab09/mrplSystem.m[m
+[36m@@ -8,7 +8,11 @@[m [mclassdef mrplSystem[m
+     properties(Constant)[m
+         wheelbase = 0.09;[m
+         Vref = 0.2;[m
+[31m-        Pgp = pose(-0.075, 0, 0);[m
+[32m+[m[32m        % pose of goal to pallet[m
+[32m+[m[32m        Pgp = pose(-0.15, 0, 0);[m
+[32m+[m[32m        % pose of acquisition position to goal[m
+[32m+[m[32m        % pose of the final position wrt to the acquisition position[m
+[32m+[m[32m        Pfp = pose(0.05, 0, 0);[m
+         % might need to be negative[m
+         Psr = pose(0, 0, -0.0350);[m
+         % 0.0337 specifically for Robit 16[m
+[36m@@ -28,6 +32,7 @@[m [mclassdef mrplSystem[m
+         realTh[m
+         spline[m
+         Tgp[m
+[32m+[m[32m        Tfp[m
+         Tsr[m
+     end[m
+     [m
+[36m@@ -57,7 +62,7 @@[m [mclassdef mrplSystem[m
+             obj.spline = 0;[m
+             obj.Tgp = obj.Pgp.bToA;[m
+             obj.Tsr = obj.Psr.bToA;[m
+[31m-[m
+[32m+[m[32m            obj.Tfp = obj.Pfp.bToA;[m
+         end[m
+         [m
+         function [V, w] = useFeedback(obj, refPose, acPose, tau, currT, ang, lin)[m
+[36m@@ -146,6 +151,7 @@[m [mclassdef mrplSystem[m
+             legend({'Reference Path', 'Robot Path'});[m
+         end[m
+         [m
+[32m+[m[32m        % sets up finding the position of the sail before driving into it[m
+         function [xf, yf, thf, errf, numf] = findSail(obj, sailFinder)[m
+             roiMidpoints = sailFinder.roiFilter();[m
+             roiMidpoints = roiMidpoints';[m
+[36m@@ -173,7 +179,7 @@[m [mclassdef mrplSystem[m
+             Pps = pose(xf, yf, thf);[m
+             % transform of pallet to sensor[m
+             Tps = Pps.bToA;[m
+[31m-            % transform of goal to robot[m
+[32m+[m[32m            % transform of acquisition position to robot[m
+             Tgr = obj.Tsr * Tps * obj.Tgp;[m
+             Pgr = pose.matToPoseVec(Tgr);[m
+             xf = Pgr(1);[m
+[36m@@ -189,15 +195,15 @@[m [mclassdef mrplSystem[m
+             xf = endPoint(1);[m
+             yf = endPoint(2);[m
+             thf = endPoint(3);[m
+[31m-            sgn = 1;[m
+             [m
+             if (lin)[m
+                 obj.spline = trajectoryReferenceControl(obj.amax, obj.Vref, endPoint(1), sgn, 0);[m
+             elseif (ang)[m
+[31m-                [m
+[32m+[m[32m                obj.spline = rotationalReferenceControl(obj.amax, obj.Vref, endPoint(3), sgn, 0);[m
+             else[m
+                 obj.spline = cubicSpiral.planTrajectory(xf, yf, thf, sgn);[m
+                 obj.spline.planVelocities(obj.Vref);[m
+[32m+[m[32m            end[m
+             [m
+             % pushes the robot on the actual trajectory[m
+             dur = obj.spline.getTrajectoryDuration();[m
+[36m@@ -238,7 +244,7 @@[m [mclassdef mrplSystem[m
+                     % compute the controller with properly adjusted coordinates[m
+                     refPose = pose(relx, rely, relth);[m
+                     acPose = pose(xReal, yReal, thReal);[m
+[31m-                    [V, w] = obj.useFeedback(refPose, acPose, tau, currT);[m
+[32m+[m[32m                    [V, w] = obj.useFeedback(refPose, acPose, tau, currT, ang, lin);[m
+                 end[m
+ [m
+                 [vl, vr] = robotModel.VwTovlvr(V, w);[m
+[36m@@ -309,73 +315,41 @@[m [mclassdef mrplSystem[m
+                 if xf == 10000[m
+                     continue[m
+                 end[m
+[31m-                % plan and run the trajectory to the goal [m
+[31m-                obj = obj.runRobot(tau, feedBack, [xf, yf, thf]);[m
+[32m+[m[32m                % plan and run the trajectory to the acquisition pose[m
+[32m+[m[32m                obj = obj.runRobot(tau, feedBack, [xf, yf, thf], false, false, 1);[m
+[32m+[m[32m                pause(1);[m
+[32m+[m[41m                [m
+[32m+[m[32m                % go on straight line trajectory[m
+[32m+[m[32m                [xf, yf, thf] = obj.findSail(sailFinder);[m
+[32m+[m[32m                % position of goal to robot in acquisition pose, so ideally[m
+[32m+[m[32m                % straight on[m
+[32m+[m[32m                Pgr = pose(xf, yf, thf);[m
+[32m+[m[32m                % transform of pallet to robot[m[41m [m
+[32m+[m[32m                Tpr = Pgr.bToA / obj.Tgp;[m
+[32m+[m[32m                % transform of ideal final (distance + 5 cm) to robot[m
+[32m+[m[32m                Tfr = Tpr * obj.Tfp;[m
+[32m+[m[32m                Pfr = pose.matToPoseVec(Tfr);[m
+[32m+[m[32m                xf = Pfr(1);[m
+[32m+[m[41m                [m
+[32m+[m[32m                % assume straight line, if not then add in the small angle[m
+[32m+[m[32m                % movements[m
+[32m+[m[32m                obj = obj.runRobot(tau, feedBack, [xf, 0, 0], false, true, 1);[m
+[32m+[m[32m                pause(1);[m
+[32m+[m[32m                robot.forksUp();[m
+                 pause(1);[m
+[31m-                % now, get to pallet position and pick up[m
+[31m-                % obj = obj.runRobot(tau, feedBack, [0.02, 0, 0]);[m
+[31m-                % robot.forksUp();[m
+[31m-                pause(2);[m
+[32m+[m[32m                robot.forksDown();[m
+[32m+[m[32m                pause(1);[m
+[32m+[m[32m                % back up 5 cm[m
+[32m+[m[32m                xf = obj.Pfp(1);[m
+[32m+[m[32m                obj = obj.runRobot(tau, feedBack, [xf, 0, 0], false, true, -1);[m
+[32m+[m[32m                % spin around[m
+[32m+[m[32m                thf = pi;[m
+[32m+[m[32m                obj.runRobot(tau, feedBack, [0, 0, thf], true, false, 1);[m
+                 % robot.forksDown();[m
+                 if (i ~= 3)[m
+[31m-                    pause(15);[m
+[32m+[m[32m                    pause(10);[m
+                 end[m
+                 i = i + 1;[m
+[31m-                [m
+[31m-% The commented section should be handled by calling obj.runRobot(Two,[m
+[31m-% tau, endPose, positionIdx). Once confirmed to work, delete this section of code            [m
+[31m-[m
+[31m-%                 dur = obj.spline.getTrajectoryDuration();[m
+[31m-% [m
+[31m-%                 currT = 0;[m
+[31m-%                 firstIteration = false;[m
+[31m-                [m
+[31m-                [m
+[31m-[m
+[31m-%                 while(currT < dur)[m
+[31m-%                     if(firstIteration == false)[m
+[31m-%                         startTic = tic();        [m
+[31m-%                         firstIteration = true;[m
+[31m-%                         continue;[m
+[31m-%                     end[m
+[31m-%                     [m
+[31m-%                     % update our state estimation[m
+[31m-%                     obj = obj.updateStateEst();[m
+[31m-%                     [m
+[31m-%                     % clock time[m
+[31m-%                     currT = toc(startTic);[m
+[31m-%                     [m
+[31m-%                     % get goal position[m
+[31m-%                     [relx, rely, relth] = obj.getReferenceToWorldPose(currT, Two);[m
+[31m-%                     obj.refX(1, positionIdx) = relx;[m
+[31m-%                     obj.refY(1, positionIdx) = rely;[m
+[31m-%                     obj.refTh(1, positionIdx) = relth;[m
+[31m-%                     [m
+[31m-%                     % get state estimation[m
+[31m-%                     [xReal, yReal, thReal] = obj.estRobot.getRobotPose();[m
+[31m-%                     obj.realX(1, positionIdx) = xReal;[m
+[31m-%                     obj.realY(1, positionIdx) = yReal;[m
+[31m-%                     obj.realTh(1, positionIdx) = thReal;[m
+[31m-% [m
+[31m-%                     % get reference velocities[m
+[31m-%                     V = obj.spline.getVAtTime(currT);[m
+[31m-%                     w = obj.spline.getwAtTime(currT);[m
+[31m-% [m
+[31m-%                     if (feedBack)[m
+[31m-%                         % compute the controller with properly adjusted coordinates[m
+[31m-%                         refPose = pose(relx, rely, relth);[m
+[31m-%                         acPose = pose(xReal, yReal, thReal);[m
+[31m-%                         [V, w] = obj.useFeedback(refPose, acPose, tau, currT);[m
+[31m-%                     end[m
+[31m-% [m
+[31m-%                     [vl, vr] = robotModel.VwTovlvr(V, w);[m
+[31m-%                     positionIdx = positionIdx + 1;[m
+[31m-% [m
+[31m-%                     robot.sendVelocity(vl, vr);[m
+[31m-%                     pause(0.05);[m
+[31m-%                 end[m
+[31m-%                 robot.stop();[m
+[31m-                [m
+             end[m
+             robot.stopLaser();[m
+             robot.stop();[m
+[1mdiff --git a/lab09/rotationalReferenceControl.asv b/lab09/rotationalReferenceControl.asv[m
+[1mnew file mode 100644[m
+[1mindex 0000000..af156df[m
+[1m--- /dev/null[m
+[1m+++ b/lab09/rotationalReferenceControl.asv[m
+[36m@@ -0,0 +1,132 @@[m
+[32m+[m[32mclassdef rotationalReferenceControl[m
+[32m+[m[32m    %UNTITLED3 Summary of this class goes here[m
+[32m+[m[32m    %   Detailed explanation goes here[m
+[32m+[m[32m    properties(Constant)[m
+[32m+[m[32m        wheelbase = 0.09[m
+[32m+[m[32m    end[m
+[32m+[m[41m        [m
+[32m+[m[32m    properties[m
+[32m+[m[32m        amax[m
+[32m+[m[32m        vmax[m
+[32m+[m[32m        wmax[m
+[32m+[m[32m        angleAMax[m
+[32m+[m[32m        angle[m
+[32m+[m[32m        arclen[m
+[32m+[m[32m        sgn[m
+[32m+[m[32m        tPause[m
+[32m+[m[32m        tRamp[m
+[32m+[m[32m        tf[m
+[32m+[m[32m        Tdelay[m
+[32m+[m[32m        ki[m
+[32m+[m[32m        kp[m
+[32m+[m[32m        kd[m
+[32m+[m[32m        idealArr[m
+[32m+[m[32m        delayedArr[m
+[32m+[m[32m        realArr[m
+[32m+[m[32m        wArr[m
+[32m+[m[32m        errArr[m
+[32m+[m[32m        tArr[m
+[32m+[m[32m        ks[m
+[32m+[m[32m        kv[m
+[32m+[m[32m        Tf[m
+[32m+[m[32m    end[m
+[32m+[m[41m    [m
+[32m+[m[32m    methods[m
+[32m+[m[32m        function obj = rotationalReferenceControl(amax, vmax, angle, sgn, tPause)[m
+[32m+[m[32m            %UNTITLED3 Construct an instance of this class[m
+[32m+[m[32m            %   Detailed explanation goes here[m
+[32m+[m[32m            obj.amax = amax;[m
+[32m+[m[32m            obj.vmax = vmax;[m
+[32m+[m[32m            obj.wmax = 4*vmax / obj.wheelbase;[m
+[32m+[m[32m            obj.angleAMax = 4*amax / obj.wheelbase;[m
+[32m+[m[32m            obj.angle = angle;[m
+[32m+[m[41m            [m
+[32m+[m[32m            obj.arclen = angle * obj.wheelbase / 2;[m
+[32m+[m[32m            obj.sgn = sgn;[m
+[32m+[m[32m            obj.tRamp = obj.wmax / obj.angleAMax;[m
+[32m+[m[32m            if obj.angle < obj.wmax * obj.tRamp[m
+[32m+[m[32m                obj.wmax = obj.angle / 1.5;[m
+[32m+[m[32m                obj.angleAMax = obj.wmax * 2;[m
+[32m+[m[32m                obj.tRamp = obj.wmax / obj.angleAMax;[m
+[32m+[m[32m            end[m[41m [m
+[32m+[m[32m            obj.tf = (obj.angle + ((obj.wmax).^2)/obj.angleAMax)/obj.wmax;[m
+[32m+[m[32m            obj.tPause = tPause;[m
+[32m+[m[32m            obj.ks = 1;[m
+[32m+[m[32m            obj.kv = 1;[m
+[32m+[m[32m            obj.Tf = obj.tf * obj.ks / obj.kv;[m
+[32m+[m[41m           [m
+[32m+[m[32m            % figure out what the real delay is but this should be ok[m
+[32m+[m[32m            obj.Tdelay = 0.2;[m
+[32m+[m[32m            obj.kp = 3;[m
+[32m+[m[32m            obj.ki = 0.0;[m
+[32m+[m[32m            obj.kd = 0.12;[m
+[32m+[m[41m            [m
+[32m+[m[32m            currT = 0;[m
+[32m+[m[32m            prevT = 0;[m
+[32m+[m
+[32m+[m[32m            currIdealAngle = 0;[m
+[32m+[m[32m            delayedCurrIdealAngle = 0;[m
+[32m+[m[32m            firstIteration = false;[m
+[32m+[m
+[32m+[m[32m            % Graphing setup[m
+[32m+[m[32m            len = 1000;[m
+[32m+[m[32m            obj.idealArr = zeros(1, len);[m
+[32m+[m[32m            obj.delayedArr = zeros(1, len);[m
+[32m+[m[32m            obj.realArr = zeros(1, len);[m
+[32m+[m[32m            obj.errArr = zeros(1, len);[m
+[32m+[m[32m            obj.wArr = zeros(1, len);[m
+[32m+[m[32m            obj.tArr = zeros(1, len);[m
+[32m+[m
+[32m+[m[32m            count = 1;[m
+[32m+[m[32m            pause(3);[m
+[32m+[m
+[32m+[m[32m            while(currT < obj.getTrajectoryDuration())[m
+[32m+[m[32m                if(firstIteration == false)[m
+[32m+[m[32m                    startTic = tic();[m[41m        [m
+[32m+[m[32m                    firstIteration = true;[m
+[32m+[m[32m                end[m
+[32m+[m[32m                currT = toc(startTic);[m
+[32m+[m[32m                deltaT = currT - prevT;[m
+[32m+[m[32m                [~, ff] = obj.computeControl(currT);[m
+[32m+[m[32m                feedForward = ff * sgn;[m
+[32m+[m[32m                currIdealAngle = currIdealAngle + feedForward * deltaT;[m
+[32m+[m[32m                delayedFeedForward = obj.computeControl(currT - obj.Tdelay) * sgn;[m
+[32m+[m[32m                delayedCurrIdealAngle = delayedCurrIdealAngle + delayedFeedForward * deltaT;[m
+[32m+[m[32m                obj.idealArr(count) = currIdealAngle;[m
+[32m+[m[32m                obj.delayedArr(count) = delayedCurrIdealAngle;[m
+[32m+[m[32m                obj.tArr(count) = currT;[m
+[32m+[m[32m                count = count + 1;[m
+[32m+[m[32m                prevT = currT;[m
+[32m+[m[32m                pause(0.01);[m
+[32m+[m[32m            end[m
+[32m+[m[32m            obj.idealArr = obj.idealArr(1:count-1);[m
+[32m+[m[32m            obj.delayedArr = obj.delayedArr(1:count-1);[m
+[32m+[m[32m            obj.tArr = obj.tArr(1:count-1);[m
+[32m+[m[32m        end[m
+[32m+[m
+[32m+[m[32m        function [V, w] = computeControl(obj, t)[m
+[32m+[m[32m            if (t < 0 || t > obj.tf)[m
+[32m+[m[32m                w = 0;[m
+[32m+[m[32m            elseif (t < obj.tRamp)[m
+[32m+[m[32m                w = obj.angleAMax * t;[m
+[32m+[m[32m            elseif (obj.tf - t < obj.tRamp)[m
+[32m+[m[32m                w = obj.angleAMax * (obj.tf - t);[m
+[32m+[m[32m            elseif (obj.tRamp < t && t < obj.tf - obj.tRamp)[m
+[32m+[m[32m                w = obj.wmax;[m
+[32m+[m[32m            else[m
+[32m+[m[32m                w = 0;[m
+[32m+[m[32m            end[m
+[32m+[m[32m            % computes angles turning to the left as positive, angles to[m
+[32m+[m[32m            % the right as negative[m
+[32m+[m[32m            % [~, w] = robotModel.vlvrToVw(-V, V);[m
+[32m+[m[32m            V = 0;[m
+[32m+[m[32m        end[m
+[32m+[m
+[32m+[m[32m        function duration = getTrajectoryDuration(obj)[m
+[32m+[m[32m            %METHOD1 Summary of this method goes here[m
+[32m+[m[32m            %   Detailed explanation goes here[m
+[32m+[m[32m            duration = obj.Tf + obj.tPause;[m
+[32m+[m[32m        end[m
+[32m+[m[32m    end[m
+[32m+[m[32mend[m
+[32m+[m
+[1mdiff --git a/lab09/rotationalReferenceControl.m b/lab09/rotationalReferenceControl.m[m
+[1mindex 24b3fc0..9273fab 100644[m
+[1m--- a/lab09/rotationalReferenceControl.m[m
+[1m+++ b/lab09/rotationalReferenceControl.m[m
+[36m@@ -23,6 +23,7 @@[m [mclassdef rotationalReferenceControl[m
+         idealArr[m
+         delayedArr[m
+         realArr[m
+[32m+[m[32m        wArr[m
+         errArr[m
+         tArr[m
+         ks[m
+[36m@@ -44,8 +45,8 @@[m [mclassdef rotationalReferenceControl[m
+             obj.sgn = sgn;[m
+             obj.tRamp = obj.wmax / obj.angleAMax;[m
+             if obj.angle < obj.wmax * obj.tRamp[m
+[31m-                obj.wmax = obj.angle / 1.5;[m
+[31m-                obj.angleAMax = obj.wmax * 2;[m
+[32m+[m[32m                obj.wmax = obj.angle / 2;[m
+[32m+[m[32m                obj.angleAMax = obj.wmax;[m
+                 obj.tRamp = obj.wmax / obj.angleAMax;[m
+             end [m
+             obj.tf = (obj.angle + ((obj.wmax).^2)/obj.angleAMax)/obj.wmax;[m
+[36m@@ -63,7 +64,6 @@[m [mclassdef rotationalReferenceControl[m
+             currT = 0;[m
+             prevT = 0;[m
+ [m
+[31m-            delayedFeedForward = 0;[m
+             currIdealAngle = 0;[m
+             delayedCurrIdealAngle = 0;[m
+             firstIteration = false;[m
+[36m@@ -74,6 +74,7 @@[m [mclassdef rotationalReferenceControl[m
+             obj.delayedArr = zeros(1, len);[m
+             obj.realArr = zeros(1, len);[m
+             obj.errArr = zeros(1, len);[m
+[32m+[m[32m            obj.wArr = zeros(1, len);[m
+             obj.tArr = zeros(1, len);[m
+ [m
+             count = 1;[m
+[36m@@ -88,6 +89,7 @@[m [mclassdef rotationalReferenceControl[m
+                 deltaT = currT - prevT;[m
+                 [~, ff] = obj.computeControl(currT);[m
+                 feedForward = ff * sgn;[m
+[32m+[m[32m                obj.wArr(count) = feedForward;[m
+                 currIdealAngle = currIdealAngle + feedForward * deltaT;[m
+                 delayedFeedForward = obj.computeControl(currT - obj.Tdelay) * sgn;[m
+                 delayedCurrIdealAngle = delayedCurrIdealAngle + delayedFeedForward * deltaT;[m
+[36m@@ -100,6 +102,7 @@[m [mclassdef rotationalReferenceControl[m
+             end[m
+             obj.idealArr = obj.idealArr(1:count-1);[m
+             obj.delayedArr = obj.delayedArr(1:count-1);[m
+[32m+[m[32m            obj.wArr = obj.wArr(1:count-1);[m
+             obj.tArr = obj.tArr(1:count-1);[m
+         end[m
+ [m
+[36m@@ -121,6 +124,14 @@[m [mclassdef rotationalReferenceControl[m
+             V = 0;[m
+         end[m
+ [m
+[32m+[m[32m        function V = getWAtTime(obj, t)[m
+[32m+[m[32m            V = 0;[m
+[32m+[m[32m        end[m
+[32m+[m[41m              [m
+[32m+[m[32m        function w = getwAtTime(obj, t)[m
+[32m+[m[32m            w = interp1(obj.tArr, obj.wArr, t);[m
+[32m+[m[32m        end[m
+[32m+[m
+         function duration = getTrajectoryDuration(obj)[m
+             %METHOD1 Summary of this method goes here[m
+             %   Detailed explanation goes here[m
+[1mdiff --git a/lab09/trajectoryFollower.m b/lab09/trajectoryFollower.m[m
+[1mindex 3f5c89c..bc3fe76 100644[m
+[1m--- a/lab09/trajectoryFollower.m[m
+[1m+++ b/lab09/trajectoryFollower.m[m
+[36m@@ -31,7 +31,7 @@[m [mclassdef trajectoryFollower[m
+             if (ang) % angular error[m
+                 [uv, uw] = obj.controller.turningError();[m
+             elseif (lin) % feed forward[m
+[31m-                uv = 0;[m
+[32m+[m[32m                [uv, ~] = obj.controller.error();[m
+                 uw = 0;[m
+             else % both errors[m
+                 [uv, uw] = obj.controller.error();[m
+[1mdiff --git a/lab09/trapezoidalReferenceControl.m b/lab09/trapezoidalReferenceControl.m[m
+[1mindex bdd1895..a719c27 100644[m
+[1m--- a/lab09/trapezoidalReferenceControl.m[m
+[1m+++ b/lab09/trapezoidalReferenceControl.m[m
+[36m@@ -18,6 +18,7 @@[m [mclassdef trapezoidalReferenceControl[m
+         delayedArr[m
+         realArr[m
+         errArr[m
+[32m+[m[32m        velArr[m
+         tArr[m
+         ks[m
+         kv[m
+[36m@@ -33,6 +34,12 @@[m [mclassdef trapezoidalReferenceControl[m
+             obj.dist = dist;[m
+             obj.sgn = sgn;[m
+             obj.tRamp = obj.vmax / obj.amax;[m
+[32m+[m[41m            [m
+[32m+[m[32m            if obj.dist < obj.vmax * obj.tRamp[m
+[32m+[m[32m                obj.vmax = obj.dist / 2;[m
+[32m+[m[32m                obj.amax = obj.vmax;[m
+[32m+[m[32m                obj.tRamp = obj.vmax / obj.amax;[m
+[32m+[m[32m            end[m[41m [m
+             obj.tf = (obj.dist + ((obj.vmax).^2)/obj.amax)/obj.vmax;[m
+             obj.tPause = tPause;[m
+             obj.ks = 1;[m
+[36m@@ -48,7 +55,6 @@[m [mclassdef trapezoidalReferenceControl[m
+             currT = 0;[m
+             prevT = 0;[m
+ [m
+[31m-            delayedFeedForward = 0;[m
+             currIdealPos = 0;[m
+             delayedCurrIdealPos = 0;[m
+             firstIteration = false;[m
+[36m@@ -59,6 +65,7 @@[m [mclassdef trapezoidalReferenceControl[m
+             obj.delayedArr = zeros(1, len);[m
+             obj.realArr = zeros(1, len);[m
+             obj.errArr = zeros(1, len);[m
+[32m+[m[32m            obj.velArr = zeros(1, len);[m
+             obj.tArr = zeros(1, len);[m
+ [m
+             count = 1;[m
+[36m@@ -72,6 +79,7 @@[m [mclassdef trapezoidalReferenceControl[m
+                 currT = toc(startTic);[m
+                 deltaT = currT - prevT;[m
+                 feedForward = obj.computeControl(currT);[m
+[32m+[m[32m                obj.velArr(count) = feedForward;[m
+                 currIdealPos = currIdealPos + feedForward * deltaT;[m
+                 delayedFeedForward = obj.computeControl(currT - obj.Tdelay);[m
+                 delayedCurrIdealPos = delayedCurrIdealPos + delayedFeedForward * deltaT;[m
+[36m@@ -84,6 +92,7 @@[m [mclassdef trapezoidalReferenceControl[m
+             end[m
+             obj.idealArr = obj.idealArr(1:count-1);[m
+             obj.delayedArr = obj.delayedArr(1:count-1);[m
+[32m+[m[32m            obj.velArr = obj.velArr(1:count-1);[m
+             obj.tArr = obj.tArr(1:count-1);[m
+         end[m
+ [m
+[36m@@ -102,6 +111,14 @@[m [mclassdef trapezoidalReferenceControl[m
+             end[m
+             V = obj.sgn * V;[m
+         end[m
+[32m+[m[41m        [m
+[32m+[m[32m        function V = getVAtTime(obj, t)[m
+[32m+[m[32m            V = interp1(obj.tArr, obj.velArr, t);[m
+[32m+[m[32m        end[m
+[32m+[m[41m              [m
+[32m+[m[32m        function w = getwAtTime(obj, t)[m
+[32m+[m[32m            w = 0;[m
+[32m+[m[32m        end[m
+ [m
+         function duration = getTrajectoryDuration(obj)[m
+             %METHOD1 Summary of this method goes here[m

@@ -16,7 +16,7 @@ classdef mrplSystem
         % might need to be negative
         Psr = pose(0, 0, -0.08);
         % 0.0337 specifically for Robit 16
-        maxLen = 0.14; % test for now
+        maxLen = 0.13; % test for now
         arrLen = 2000;
         amax = 0.1;
     end
@@ -192,51 +192,24 @@ classdef mrplSystem
             disp([xf, yf, thf]);
         end
         
-        % sets up finding the position of the sail before driving into it
-        function [tx, ty, cx, cy] = justFind(obj, sailFinder)
-            roiMidpoints = sailFinder.roiFilter();
-            roiMidpoints = roiMidpoints';
-            roiSize = size(roiMidpoints, 1);
-            errf = 10000;
-            xf = 10000;
-            yf = 10000;
-            thf = 10000;
-            numf = 10000;
-            for i=1:roiSize
-                [x, y, th, err, num] = sailFinder.findLineCandidate(roiMidpoints(i,:), obj.maxLen);
-                if err < errf
-                    xf = x;
-                    yf = y;
-                    thf = th;
-                    errf = err;
-                    numf = num;
-                    cx = sailFinder.finalXBox;
-                    cy = sailFinder.finalYBox;
-                    tx = sailFinder.testXBox;
-                    ty = sailFinder.testYBox;
-                end
-            end
-            % if nothing was found, loop again
-            if xf == 10000
-                return
-            end
-            disp([xf, yf, thf]);
-        end
-        
-        function [tx, ty, cx, cy, xs, ys] = rangeTesting(obj)
+        function obj = rangeTesting(obj)
             global robot;
             robot = raspbot('RaspBot-MyBoy');
             robot.startLaser();
             pause(3);
-            laserData = robot.laser.LatestMessage.Ranges;
-            sailfinder = rangeImage(laserData, 1, true);
-            [tx, ty, cx, cy] = obj.justFind(sailfinder);
-            xs = sailfinder.xArray;
-            ys = sailfinder.yArray;
-            pause(1);
-            robot.stopLaser();
-        end
+            while true
+                if ~(waitforbuttonpress)
+                    pause(0.5);
+                    continue;
+                end
+                laserData = robot.laser.LatestMessage.Ranges;
+                sailfinder = rangeImage(laserData, 1, true);
+                [xf, yf, thf] = obj.findSail(sailFinder);
                 
+            
+            
+        
+        
         function obj = runRobot(obj, tau, feedBack, endPoint, ang, lin, sgn)
             global robot;
             global positionIdx;

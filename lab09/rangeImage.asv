@@ -10,7 +10,7 @@ classdef rangeImage < handle
         edgeWeights = 10;
         wallThresh = 1.5;
         % [0.2, 0.3, 0.6, -0.6]
-        boundingRect = [0.15, 0.35, 0.6, -0.6];
+        boundingRect = [0.2, 0.3, 0.6, -0.6];
     end
     
     properties(Access = public)
@@ -44,8 +44,10 @@ classdef rangeImage < handle
             endX = xs(end);
             startY = ys(1);
             endY = ys(end);
-            dist = 100000;
-            ind = 0;
+            sdist = 100000;
+            edist = 100000;
+            sind = 0;
+            eind = 0;
             inds = find(~ismember(allxs, xs));
             searchX = allxs(inds);
             searchY = allys(inds);
@@ -54,17 +56,26 @@ classdef rangeImage < handle
                 yPoint = searchY(i);
                 startDist = sqrt((startX - xPoint)^2 + (startY - yPoint)^2);
                 endDist = sqrt((endX - xPoint)^2 + (endY - yPoint)^2);
-                thisDist = min(startDist, endDist);
-                if thisDist < dist
-                    x = xPoint;
-                    y = yPoint;
-                    ind = i;
-                    dist = thisDist;
+                if startDist < sdist
+                    xs = xPoint;
+                    ys = yPoint;
+                    sind = i;
+                    sdist = startDist;
                 end
+                if endDist < edist
+                    xe = xPoint;
+                    ye = yPoint;
+                    eind = i;
+                    edist = endDist;
+                end 
             end
-            if ind == 0
-                x = 0;
-                y = 0;
+            if sind == 0
+                xs = 0;
+                ys = 0;
+            end
+            if eind == 0
+                xe = 0;
+                ye = 0;
             end
         end
                 
@@ -230,11 +241,16 @@ classdef rangeImage < handle
                 t = candidateT(1:candidateIdx);
                 x = candidateX(1:candidateIdx);
                 y = candidateY(1:candidateIdx);
-                [xClose, yClose] = rangeImage.nextClosest(x, y, obj.xArray, obj.yArray);
-                if xClose ~= 0
+                [xsClose, ysClose, xeClose, yeClose] = rangeImage.nextClosest(x, y, obj.xArray, obj.yArray);
+                if xsClose ~= 0
                     testIdx = testIdx + 1;
-                    testBoxX(testIdx) = xClose;
-                    testBoxY(testIdx) = yClose;
+                    testBoxX(testIdx) = xsClose;
+                    testBoxY(testIdx) = ysClose;
+                end
+                if xeClose ~= 0
+                    testIdx = testIdx + 1;
+                    testBoxX(testIdx) = xeClose;
+                    testBoxY(testIdx) = yeClose;
                 end
                     
                 xTest = testBoxX(1:testIdx);
