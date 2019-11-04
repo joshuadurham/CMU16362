@@ -79,11 +79,7 @@ classdef estRobot
             end
         end
         
-        function obj = setPose(obj, pose)
-            obj.x = pose.x();
-            obj.y = pose.y();
-            obj.th = pose.th();
-        end
+        function obj = setPose 
         
         function [x, y, th] = getRobotPose(obj)
             x = obj.x;

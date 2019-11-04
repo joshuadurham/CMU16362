@@ -472,22 +472,13 @@ classdef mrplSystem
             obj.estRobot = obj.estRobot.setPose(initPose);
             
             % run once to make the thing
-            laserPointsWorldFrame = [];
+            lxys = [];
             lxyHandle = [];
-            
-            robotPointsWorldFrame = [];
-            rxyHandle = [];
-            
             while true
-                if size(laserPointsWorldFrame, 2) > 0
+                if size(lxys, 2) > 0
                     del(lxyHandle);
                 end    
-                if size(robotPointsWorldFrame, 2) > 0
-                    del(rxyHandle);
-                end
-                
                 robotKeyPressDriver.drive(robot, vGain);
-                
                 laserData = robot.laser.LatestMessage.Ranges;
                 % get the points in the rangeImage
                 rangeIm = rangeImage(laserData, 10, true);
@@ -501,21 +492,19 @@ classdef mrplSystem
                 % pose of robot wrt world
                 Prw = pose(xrw, yrw, thrw);
                 Trw = Prw.bToA();
-                
                 bodyPts = robotModel.bodyGraph();
                 robotPointsWorldFrame = Trw * bodyPts;
                 laserPointsWorldFrame = Trw * laserPointsRobotFrame;
-                
                 xRobot = robotPointsWorldFrame(1, :);
                 yRobot = robotPointsWorldFrame(2, :);
-                rxyHandle = plot(xRobot, yRobot, 'g');
-                
+                rxyHandle = plot(xRobot, yRobot, '
                 xWorld = laserPointsWorldFrame(1, :);
                 yWorld = laserPointsWorldFrame(2, :);
                 lxyHandle = plot(xWorld, yWorld, 'r');
-                pause(0.05);
             end
         end
+                
+            
     end
     
 end
