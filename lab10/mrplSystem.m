@@ -140,6 +140,10 @@ classdef mrplSystem
             obj.estRobot = obj.estRobot.updatePosition(left, right);
         end
         
+        function obj = updateStateEstLidar(obj, lineMapLocalizer, rangeIm)
+            obj.estRobot = obj.estRobot.updatePositionLidar(lineMapLocalizer, rangeIm);
+        end 
+        
         function plotData(obj)
             clf;
             hold on;
@@ -284,7 +288,7 @@ classdef mrplSystem
             initRightEncoder = currRightEncoder;
             initTime = timestamp;
             
-            % set baseline for state estimator
+            set baseline for state estimator
             obj.estRobot.initLeftEncoder = initLeftEncoder;
             obj.estRobot.initRightEncoder = initRightEncoder;
             obj.estRobot.lastTime = initTime;
@@ -384,6 +388,51 @@ classdef mrplSystem
             obj.plotData();
         end
         
+        function filterData = filterLaserData(obj, laserData)
+            filterData = laserData(1:10:size(laserData, 2));
+        end
+            
+        
+        function obj = teleopAndMapLidarOnly(obj)
+            global robot;
+            robot = raspbot('RaspBot-11');
+            robot.startLaser();
+            pause(3);
+            
+            xlim([-0.6 0.6]);
+            ylim([-0.6 0.6]);
+            title('Path of Robot');
+            xlabel('x (meters)');
+            ylabel('y (meters)');
+            
+            % figure out how to actually get these lines in, l1 l2 being
+            % the maps
+            l1 = [];
+            l2 = [];
+            gain = 0.3;
+            errThresh = 0.01;
+            gradThresh = 0.0005;
+            vGain = 0.5;
+            
+            
+            localizer = lineMapLocalizer(l1, l2, gain, errThresh, gradThresh);
+            laserData = robot.laser.LatestMessage.Ranges;
+            filteredData = obj.filterLaserData(laserData);
+            obj = obj.updateStateEstLidar(localizer, filteredData);
+            keyDriver = robotKeyPressDriver(gcf);
+            pause(2);
+            count = 1;
+            
+            while true
+                robotKeyPressDriver.drive(robot, vGain);
+                
+                laserData = robot.laser.LatestMessage.Ranges;
+                filteredData = obj.filterLaserData(laserData);
+                obj = obj.updateStateEstLidar(localizer, filteredData);
+            end
+        end
+                
+            
     end
     
 end

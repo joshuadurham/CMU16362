@@ -67,6 +67,18 @@ classdef estRobot
             obj.prevRightEncoder = rEnc;
         end
         
+        function obj = updatePositionLidar(obj, lineMapLocalizer, rangeIm)
+            inPose = pose(obj.x, obj.y, obj.th);
+            [succ, outPose] = lineMapLocalizer(inPose, rangeIm, 10000);
+            if succ
+                obj.x = outPose.x();
+                obj.y = outPose.y();
+                obj.th = outPose.th();
+            else
+                disp("failed to localize");
+            end
+        end  
+        
         function [x, y, th] = getRobotPose(obj)
             x = obj.x;
             y = obj.y;
