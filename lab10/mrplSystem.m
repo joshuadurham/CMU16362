@@ -136,7 +136,7 @@ classdef mrplSystem
         end
         
         function obj = updateStateEst(obj)
-            [left, right, ~] = estRobot.getEncData();
+            [left, right, ~] = obj.estRobot.getEncData();
             obj.estRobot = obj.estRobot.updatePosition(left, right);
         end
         
@@ -444,30 +444,32 @@ classdef mrplSystem
             robot.startLaser();
             pause(3);
             
-            xlim([-0.6 0.6]);
-            ylim([-0.6 0.6]);
+            xlim([-0.1 1.2]);
+            ylim([-0.1 1.2]);
             title('Path of Robot');
             xlabel('x (meters)');
             ylabel('y (meters)');
             
             % figure out how to actually get these lines in, l1 l2 being
             % the maps
-            l1 = [];
-            l2 = [];
+            l1 = [0.05, 0; 
+                  0, 0.05];
+            l2 = [1.219, 0;
+                  0, 1.219];
             % points of the walls wrt to the world
             gain = 0.3;
             errThresh = 0.01;
             gradThresh = 0.0005;
-            vGain = 0.5;
+            vGain = 1.25;
             
             localizer = lineMapLocalizer(l1, l2, gain, errThresh, gradThresh);
-            keyDriver = robotKeyPressDriver(gcf);
+            keyDriver = robotKeypressDriver(gcf);
             pause(2);
             
             figure(1);
             hold on;
-            plot(l1(1, :), l1(2, :), 'b');
-            plot(l2(1, :), l2(2, :), 'b');
+            plot([l1(1, 1), l2(1, 1)], [l1(2, 1), l2(2, 1)], 'b');
+            plot([l1(1, 2), l2(1, 2)], [l1(2, 2), l2(2, 2)], 'b');
             initPose = pose(15*0.0254,9*0.0254,pi()/2.0);
             obj.estRobot = obj.estRobot.setPose(initPose);
             
@@ -480,13 +482,13 @@ classdef mrplSystem
             
             while true
                 if size(laserPointsWorldFrame, 2) > 0
-                    del(lxyHandle);
+                    delete(lxyHandle);
                 end    
                 if size(robotPointsWorldFrame, 2) > 0
-                    del(rxyHandle);
+                    delete(rxyHandle);
                 end
                 
-                robotKeyPressDriver.drive(robot, vGain);
+                robotKeypressDriver.drive(robot, vGain);
                 
                 laserData = robot.laser.LatestMessage.Ranges;
                 % get the points in the rangeImage
@@ -494,17 +496,18 @@ classdef mrplSystem
                 % set up the 
                 laserPointsRobotFrame = [rangeIm.xArray;
                                          rangeIm.yArray;
-                                         ones(size(rangeIm.xArray, 2))];
+                                         ones(1, size(rangeIm.xArray, 2))];
                 obj = obj.updateStateEstLidar(localizer, laserPointsRobotFrame);
                 % x, y, th of robot wrt world from the localization
                 [xrw, yrw, thrw] = obj.estRobot.getRobotPose();
+                idxs = obj.estRobot.getFitIds();
                 % pose of robot wrt world
                 Prw = pose(xrw, yrw, thrw);
                 Trw = Prw.bToA();
                 
                 bodyPts = robotModel.bodyGraph();
                 robotPointsWorldFrame = Trw * bodyPts;
-                laserPointsWorldFrame = Trw * laserPointsRobotFrame;
+                laserPointsWorldFrame = Trw * laserPointsRobotFrame(:, idxs);
                 
                 xRobot = robotPointsWorldFrame(1, :);
                 yRobot = robotPointsWorldFrame(2, :);
@@ -512,7 +515,7 @@ classdef mrplSystem
                 
                 xWorld = laserPointsWorldFrame(1, :);
                 yWorld = laserPointsWorldFrame(2, :);
-                lxyHandle = plot(xWorld, yWorld, 'r');
+                lxyHandle = scatter(xWorld, yWorld, 'r');
                 pause(0.05);
             end
         end

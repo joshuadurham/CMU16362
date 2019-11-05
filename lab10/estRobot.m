@@ -8,6 +8,7 @@ classdef estRobot
         x
         y
         th
+        ids
         wheelbase
         initRightEncoder
         initLeftEncoder
@@ -69,14 +70,19 @@ classdef estRobot
         
         function obj = updatePositionLidar(obj, lineMapLocalizer, rangeIm)
             inPose = pose(obj.x, obj.y, obj.th);
-            [succ, outPose] = lineMapLocalizer.refinePose(inPose, rangeIm, 10000);
+            [succ, outPose, ids] = lineMapLocalizer.refinePose(inPose, rangeIm, 10000);
             if succ
                 obj.x = outPose.x();
                 obj.y = outPose.y();
                 obj.th = outPose.th();
+                obj.ids = ids;
             else
                 disp("failed to localize");
             end
+        end
+        
+        function ids = getFitIds(obj)
+            ids = obj.ids;
         end
         
         function obj = setPose(obj, pose)

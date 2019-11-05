@@ -50,7 +50,7 @@ classdef lineMapLocalizer < handle
             % Find ids of outliers in a scan.
             worldPts = pose.bToA()*ptsInModelFrame;
             r2 = obj.closestSquaredDistanceToLines(worldPts);
-            ids = find(r2 <= obj.maxErr*obj.maxErr);
+            ids = find(r2 > obj.maxErr*obj.maxErr);
         end
         
         function avgErr2 = fitError(obj,pose,ptsInModelFrame)
@@ -92,7 +92,7 @@ classdef lineMapLocalizer < handle
             J = [dEdx, dEdy, dEdth];
         end
         
-        function [success, outPose, ids] = refinePose(obj, inPose, ptsInModelFrame, maxIters)
+        function [success, outPose] = refinePose(obj, inPose, ptsInModelFrame, maxIters)
             % Let's cut down the number of points we process, or else it
             % runs way too slow to be used efficiently
             xVec = ptsInModelFrame(1, 1:obj.ptFrac:end);
@@ -118,7 +118,8 @@ classdef lineMapLocalizer < handle
                 xVec = [xVec currPose(1)];
                 yVec = [yVec currPose(2)];
                 
-                sumJSquaredVals = dot(J, J);
+                JSquared = dot(J  J;
+                sumJSquaredVals = sum(JSquared);
                 JMag = sqrt(sumJSquaredVals);
                 [curr_error, J] = obj.getJacobian(pose(currPose), ptsInModelFrame);
                 if (curr_error < obj.errThresh || JMag < obj.gradThresh)

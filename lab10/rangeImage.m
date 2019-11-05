@@ -2,8 +2,8 @@ classdef rangeImage < handle
     %rangeImage Stores a 1D range image and provides related services.
     
     properties(Constant)
-        maxUsefulRange = 2.0;
-        minUsefulRange = 0.05;
+        maxUsefulRange = 1.25;
+        minUsefulRange = 0.08;
         maxRangeForTarget = 1.0;
         % [x, y, w, h]
         %boundingRect = [0.0, 0.1, 0.20, -0.2];

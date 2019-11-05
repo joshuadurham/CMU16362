@@ -10,4 +10,7 @@ sailFinder.plotXvsY(2);
 rb.stopLaser();
 rb.forksUp();
 
+xs = sailFinder.xArray;
+ys = sailFinder.yArray;
+
 rb.shutdown();

@@ -1,2 +1,0 @@
-mrpl = mrplSystem();
-mrpl.executeTrajectory();
