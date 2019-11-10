@@ -4,16 +4,22 @@ classdef estRobot
     % so make sure you block on the encoder signals in the main
     % loop
     
+    properties(Constant)
+        k = 0.25;
+    end
+    
     properties
         x
         y
         th
+        ids
         wheelbase
         initRightEncoder
         initLeftEncoder
         prevLeftEncoder
         prevRightEncoder
         lastTime
+        lineMapLoc
     end
     
     methods(Static)
@@ -25,10 +31,19 @@ classdef estRobot
             r = currRightEncoder;
             time = timestamp;
         end
+        
+        function [lscan, same] = getLaserData()
+            global laserscan
+            global samescan
+            lscan = laserscan;
+            same = samescan;
+        end
     end
         
     methods
-        function obj = estRobot(wheelbase)
+        function obj = estRobot(wheelbase, lineMapLoc)
+            % takes in the params for the initial line map localization
+            % as well as the params for the wheelbase size
             obj.x = 0;
             obj.y = 0;
             obj.th = 0;
@@ -38,6 +53,7 @@ classdef estRobot
             obj.prevLeftEncoder = 0;
             obj.prevRightEncoder = 0;
             obj.lastTime = 0;
+            obj.lineMapLoc = lineMapLoc;
         end
         
         function obj = setInitEncoder(obj, lEnc, rEnc, timeStamp)
@@ -48,8 +64,8 @@ classdef estRobot
             obj.prevRightEncoder = 0;
         end 
         
-        function obj = updatePosition(obj, lEnc, rEnc)
-            % pass in the queried odometry at the top of the loop
+        function obj = updatePositionEnc(obj, lEnc, rEnc)
+            % state estimation solely on odometry
             lEnc = lEnc - obj.initLeftEncoder;
             rEnc = rEnc - obj.initRightEncoder;
             lDiff = lEnc - obj.prevLeftEncoder;
@@ -67,19 +83,49 @@ classdef estRobot
             obj.prevRightEncoder = rEnc;
         end
         
-        function obj = updatePositionLidar(obj, lineMapLocalizer, rangeIm)
+        function obj = updatePositionLidar(obj, rangeIm)
+            % 
             inPose = pose(obj.x, obj.y, obj.th);
-            [succ, outPose] = lineMapLocalizer.refinePose(inPose, rangeIm, 10000);
+            [succ, outPose, ids] = obj.lineMapLoc.refinePose(inPose, rangeIm, 50);
             if succ
                 obj.x = outPose.x();
                 obj.y = outPose.y();
                 obj.th = outPose.th();
+                obj.ids = ids;
             else
                 disp("failed to localize");
             end
         end
         
-        function obj = setPose 
+        function obj = updatePositionFusion(obj, rangeIm)
+            % assumes the current data for pose is p(est)
+            inPose = pose(obj.x, obj.y, obj.th);
+            [succ, outPose, ids] = obj.lineMapLoc.refinePose(inPose, rangeIm, 50);
+            if succ
+                obj.ids = ids;
+                errX = outPose.x() - inPose.x();
+                errY = outPose.y() - inPose.y();
+                errTh = angleArith(inPose.th(), outPose.th(), -1);
+                obj.x = obj.x - obj.k * errX;
+                obj.y = obj.y - obj.k * errY;
+                obj.th = obj.th - obj.k * errTh;
+            else
+                obj.x = inPose.x();
+                obj.y = inPose.y();
+                obj.th = inPose.th();
+                disp("No scan match");
+            end
+        end
+        
+        function ids = getFitIds(obj)
+            ids = obj.ids;
+        end
+        
+        function obj = setPose(obj, pose)
+            obj.x = pose.x();
+            obj.y = pose.y();
+            obj.th = pose.th();
+        end
         
         function [x, y, th] = getRobotPose(obj)
             x = obj.x;

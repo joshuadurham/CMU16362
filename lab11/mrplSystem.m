@@ -36,6 +36,21 @@ classdef mrplSystem
         Tsr
     end
     
+    methods(Static)
+        function lineMapLoc = makeLocalizer()
+            l1 = [0.05, 0; 
+                  0, 0.05];
+            l2 = [1.219, 0;
+                  0, 1.219];
+            % points of the walls wrt to the world
+            gain = 0.3;
+            errThresh = 0.01;
+            gradThresh = 0.0005;
+            
+            lineMapLoc = lineMapLocalizer(l1, l2, gain, errThresh, gradThresh);
+        end
+    end
+    
     methods
         function obj = mrplSystem(endpoints)
             % endpoints: absolute world coordinates of where 
@@ -50,7 +65,7 @@ classdef mrplSystem
                 obj.endpoints = [0, 0, 0];
             end 
             % estBot: odometry/estimated state of the robot
-            obj.estRobot = estRobot(obj.wheelbase);
+            obj.estRobot = estRobot(obj.wheelbase, mrplSystem.makeLocalizer());
             % state estimated arrays of data
             obj.realX = zeros(1, obj.arrLen);
             obj.realY = zeros(1, obj.arrLen);
@@ -81,9 +96,33 @@ classdef mrplSystem
             Two = originPose.aToB();
         end
         
-        function [xf, yf, thf, Two] = getEndpointToOriginPoint(obj, pointNumber)
-            % irrelevant for this lab, as 
-            % instead of the absolute world coordinates, simply use the 
+        function [xf, yf, thf, Two] = getEndpointToRobotOriginPoint(obj, pointNumber)
+            % plan trajectories from current position to absolute world coordinates
+            % by transforming to pose of endpoint in robot frame
+            % passing in the origin pose and final pose
+            % transform of world wrt robot origin
+            originPose = obj.estRobot.getRobotPoseObj();
+            Two = originPose.aToB();
+
+            % transform of endpoint wrt world
+            nextPoint = obj.endpoints(pointNumber, :);
+            nextX = nextPoint(1);
+            nextY = nextPoint(2);
+            nextTh = nextPoint(3);
+            nextPose = pose(nextX, nextY, nextTh);
+            Tew = nextPose.bToA();
+
+            % transform of endpoints wrt robot origin
+            Teo = Two * Tew;
+            endToRobotPose = pose.matToPoseVec(Teo);
+            xf = endToRobotPose(1);
+            yf = endToRobotPose(2);
+            thf = endToRobotPose(3);
+        end
+        
+        
+        function [xf, yf, thf, Two] = getEndpointToRefOriginPoint(obj, pointNumber)
+            % absolute world coordinates, simply use the 
             % robot as the origin and plan individual trajectories from
             % passing in the origin pose and final pose
             i = pointNumber;
@@ -140,9 +179,18 @@ classdef mrplSystem
             obj.estRobot = obj.estRobot.updatePositionEnc(left, right);
         end
         
-        function obj = updateStateEstLidar(obj, lineMapLocalizer, rangeIm)
-            obj.estRobot = obj.estRobot.updatePositionLidar(lineMapLocalizer, rangeIm);
-        end 
+        function obj = updateStateEstLidar(obj, rangeIm)
+            obj.estRobot = obj.estRobot.updatePositionLidar(rangeIm);
+        end
+        
+        function obj = updateStateEstFusion(obj, lineMapLocalizer)
+            [left, right, ~] = obj.estRobot.getEncData();
+            obj.estRobot = obj.estRobot.updatePosition(left, right);
+            [lscan, samescan] = obj.estRobot.getLaserData();
+            if ~samescan
+                obj.estRobot = obj.estRobot.updatePositionFusion(lineMapLocalizer, lscan);
+            end
+        end
         
         function plotData(obj)
             clf;
@@ -240,6 +288,26 @@ classdef mrplSystem
             pause(1);
             robot.stopLaser();
         end
+        
+        function obj = smallMotions(obj, tau, smallFeedBack)
+            global robot;
+            robot.forksUp();
+            pause(1);
+            robot.forksDown();
+            pause(1);
+            % back up 5 cm
+            xf = 0.05;
+            obj = obj.runRobot(tau, feedBack, [xf, 0, 0], false, true, -1);
+            % spin around
+            thf = pi;
+            obj = obj.runRobot(tau, feedBack, [0, 0, thf], true, false, 1);
+        end
+        
+        function [x, y, th] = getSailPosition(obj)                
+            global laserscan;
+            sailFinder = rangeImage(laserscan, 1, true);
+            [x, y, th] = obj.findSail(sailFinder);
+        end
                 
         function obj = runRobot(obj, tau, feedBack, endPoint, ang, lin, sgn)
             global robot;
@@ -271,8 +339,13 @@ classdef mrplSystem
                     continue;
                 end
 
-                % update our state estimation
-                obj = obj.updateStateEstEnc();
+                % update our state estimation; if no feedback (small
+                % motion) only update with odometry, otherwise use fusion
+                if ~feedBack
+                    obj = obj.updateStateEstEnc();
+                else
+                    obj = obj.updateStateEstFusion();
+                end
 
                 % clock time
                 currT = toc(startTic);
@@ -314,7 +387,7 @@ classdef mrplSystem
         end
                 
         function obj = executeTrajectory(obj)
-            % lab06 loop
+            % lab11 loop
             % have to manually clear all now
             global robot;
             global frames;
@@ -322,23 +395,29 @@ classdef mrplSystem
             global currRightEncoder;
             global timestamp;
             global positionIdx;
+            global laserscan;
+            global samescan;
             
             frames = 0;
             timestamp = 0;
             robot = raspbot('RaspBot-11');
-            robot.encoders.NewMessageFcn=@encoderEventListener;
-            robot.startLaser();
+            laserscan = zeros(1, 360);
+            samescan = true;
             
+            robot.startLaser();
+            robot.encoders.NewMessageFcn=@encoderEventListener;
+            robot.laser.NewMessageFcn=@laserEventListener;
+            
+            % get the current ENC values
             initLeftEncoder = currLeftEncoder;
             initRightEncoder = currRightEncoder;
             initTime = timestamp;
             
-            set baseline for state estimator
+            % set baseline for state estimator
             obj.estRobot.initLeftEncoder = initLeftEncoder;
             obj.estRobot.initRightEncoder = initRightEncoder;
             obj.estRobot.lastTime = initTime;
             
-
             xlim([-0.6 0.6]);
             ylim([-0.6 0.6]);
             title('Path of Robot');
@@ -347,7 +426,8 @@ classdef mrplSystem
 
             positionIdx = 1;
             tau = 5;
-            feedBack = false;
+            largeMotionFeedBack = true;
+            smallMotionFeedBack = false;
 
             control = 0;
             acPose = 0;
@@ -358,71 +438,20 @@ classdef mrplSystem
                 pause(0.05);
             end
             
-            obj = obj.updateStateEstEnc();
+            obj = obj.updateStateEstFusion();
+            initPose = pose(0.6096,0.6096,pi()/2.0);
+            obj.estRobot = obj.estRobot.setPose(initPose);
             pause(5);
+            
             robot.sendVelocity(0, 0);
-            i = 0;
-            while i < 3
-                laserData = robot.laser.LatestMessage.Ranges;
-                sailFinder = rangeImage(laserData, 1, true);
-                % returns Pgr, pose of goal to robot (not the actual
-                % pallet)
-                [xf, yf, thf] = obj.findSail(sailFinder)
-                % if nothing was found, redo it
-                if xf == 10000
-                    continue
-                end
-                % plan and run the trajectory to the acquisition pose
-                obj = obj.runRobot(tau, true, [xf, yf, thf], false, false, 1);
-                pause(1);
-                
-                % go on straight line trajectory
-                % position of goal to robot in acquisition pose, so ideally
-                % straight on
-
-%                 xf = 0.05;
-%                 if (thf > 0.1 || thf < -0.1)
-%                     if (thf > 0)
-%                         obj = obj.runRobot(tau, feedBack, [0, 0, abs(thf)], true, false, -1);
-%                     else
-%                         obj = obj.runRobot(tau, feedBack, [0, 0, abs(thf)], true, false, 1);
-%                     end
-%                 end    
-%                 
-                % assume straight line, if not then add in the small angle
-%                 [xf, yf, thf] = obj.findSail(sailFinder);
-                % movements
-                % Make this a damn function
-                laserData = robot.laser.LatestMessage.Ranges;
-                sailFinder = rangeImage(laserData, 1, true);
-                [xf, yf, thf] = obj.findSail(sailFinder);
-                Pgr = pose(xf, yf, thf);
-                % transform of pallet to robot 
-                Tpr = Pgr.bToA / obj.Tgp;
-                % transform of ideal final (distance + 5 cm) to robot
-                Tfr = Tpr * obj.Tfp;
-%                 Pgr = pose(xf, yf, thf);
-%                 Tpr = Pgr.bToA;
-                Pfr = pose.matToPoseVec(Tfr);
-                xf = Pfr(1);
-                yf = Pfr(2);
-                thf = Pfr(3);
-                obj = obj.runRobot(tau, feedBack, [xf, yf, thf], false, false, 1);
-                pause(1);
-                robot.forksUp();
-                pause(1);
-                robot.forksDown();
-                pause(1);
-                % back up 5 cm
-                xf = 0.05;
-                obj = obj.runRobot(tau, feedBack, [xf, 0, 0], false, true, -1);
-                % spin around
-                thf = pi;
-                obj = obj.runRobot(tau, feedBack, [0, 0, thf], true, false, 1);
-                % robot.forksDown();
-                pause(10);
-                i = i + 1;
+            
+            i = 2;
+            while i < size(obj.endpoints, 1)
+                [xf, yf, thf] = obj.getEndpointToRobotOriginPoint(i);
+                obj = obj.runRobot(tau, largeMotionFeedBack, [xf, yf, thf], false, false, 1);
+                pause(4);
             end
+            
             robot.stopLaser();
             robot.stop();
             robot.shutdown();
@@ -437,7 +466,6 @@ classdef mrplSystem
             filterData = laserData(1:10:size(laserData, 2));
         end
             
-        
         function obj = teleopAndMapLidarOnly(obj)
             global robot;
             robot = raspbot('RaspBot-11');
@@ -462,7 +490,6 @@ classdef mrplSystem
             gradThresh = 0.0005;
             vGain = 1.25;
             
-            localizer = lineMapLocalizer(l1, l2, gain, errThresh, gradThresh);
             keyDriver = robotKeypressDriver(gcf);
             pause(2);
             
@@ -497,7 +524,7 @@ classdef mrplSystem
                 laserPointsRobotFrame = [rangeIm.xArray;
                                          rangeIm.yArray;
                                          ones(1, size(rangeIm.xArray, 2))];
-                obj = obj.updateStateEstLidar(localizer, laserPointsRobotFrame);
+                obj = obj.updateStateEstLidar(laserPointsRobotFrame);
                 % x, y, th of robot wrt world from the localization
                 [xrw, yrw, thrw] = obj.estRobot.getRobotPose();
                 idxs = obj.estRobot.getFitIds();

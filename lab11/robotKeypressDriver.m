@@ -48,7 +48,6 @@ classdef robotKeypressDriver < handle
             % create a robotKeypressDriver for the figure handle
             % normally you call this with gcf for fh
             obj.fh = fh;
-            obj.killSwitch
             set(fh,'KeyPressFcn',@keyboardEventListener);
         end
     end
