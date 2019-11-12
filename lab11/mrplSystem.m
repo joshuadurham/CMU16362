@@ -7,7 +7,7 @@ classdef mrplSystem
     
     properties(Constant)
         wheelbase = 0.09;
-        Vref = 0.125;
+        Vref = 0.2;
         % pose of goal to pallet
         Pgp = pose(-0.25, 0, 0);
         % pose of acquisition position to goal
@@ -346,11 +346,11 @@ classdef mrplSystem
 
                 % update our state estimation; if no feedback (small
                 % motion) only update with odometry, otherwise use fusion
-                if ~feedBack
-                    obj = obj.updateStateEstEnc();
-                else
-                    obj = obj.updateStateEstFusion();
-                end
+%                 if ~feedBack
+                obj = obj.updateStateEstEnc();
+%                 else
+%                     obj = obj.updateStateEstFusion();
+%                 end
 
                 % clock time
                 currT = toc(startTic);
@@ -411,7 +411,7 @@ classdef mrplSystem
             disp("laser");
             robot.startLaser();
             robot.encoders.NewMessageFcn=@encoderEventListener;
-            robot.laser.NewMessageFcn=@laserEventListener;
+            % robot.laser.NewMessageFcn=@laserEventListener;
             
             % get the current ENC values
             initLeftEncoder = currLeftEncoder;
@@ -446,13 +446,13 @@ classdef mrplSystem
             initPose = pose(0.6096,0.6096,pi()/2.0);
             obj.estRobot = obj.estRobot.setPose(initPose);
             pause(5);
-            obj = obj.updateStateEstLidar();
+            % obj = obj.updateStateEstLidar();
             
             robot.sendVelocity(0, 0);
             disp("check");
             i = 2;
             while i <= size(obj.endpoints, 1)
-                obj = obj.updateStateEstLidar();
+                % obj = obj.updateStateEstLidar();
                 [xf, yf, thf] = obj.getEndpointToRobotOriginPoint(i);
 %                 if i == 3
 %                     obj = obj.runRobot(tau, smallMotionFeedBack, [xf, yf, thf], false, false, 1);
