@@ -7,7 +7,7 @@ classdef mrplSystem
     
     properties(Constant)
         wheelbase = 0.09;
-        Vref = 0.125;
+        Vref = 0.2;
         % pose of goal to pallet
         Pgp = pose(-0.25, 0, 0);
         % pose of acquisition position to goal
@@ -44,8 +44,8 @@ classdef mrplSystem
                   0, 1.219];
             % points of the walls wrt to the world
             gain = 0.3;
-            errThresh = 0.015;
-            gradThresh = 0.0005;
+            errThresh = 0.02;
+            gradThresh = 0.0007;
             
             lineMapLoc = lineMapLocalizer(l1, l2, gain, errThresh, gradThresh);
         end
@@ -445,21 +445,18 @@ classdef mrplSystem
             
             initPose = pose(0.6096,0.6096,pi()/2.0);
             obj.estRobot = obj.estRobot.setPose(initPose);
-            pause(5);
             obj = obj.updateStateEstLidar();
+            pause(5);
             
             robot.sendVelocity(0, 0);
             disp("check");
             i = 2;
             while i <= size(obj.endpoints, 1)
-                obj = obj.updateStateEstLidar();
                 [xf, yf, thf] = obj.getEndpointToRobotOriginPoint(i);
-%                 if i == 3
-%                     obj = obj.runRobot(tau, smallMotionFeedBack, [xf, yf, thf], false, false, 1);
-%                 else
-                    obj = obj.runRobot(tau, largeMotionFeedBack, [xf, yf, thf], false ,false, 1);
+                obj = obj.updateStateEstLidar();
+                obj = obj.runRobot(tau, largeMotionFeedBack, [xf, yf, thf], false, false, 1);
                 i = i + 1;
-                pause(2);
+                pause(4);
             end
             
             robot.stopLaser();

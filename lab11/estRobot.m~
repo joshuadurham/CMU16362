@@ -5,7 +5,7 @@ classdef estRobot
     % loop
     
     properties(Constant)
-        k = 0.125;
+        k = 0.25;
     end
     
     properties
@@ -107,15 +107,11 @@ classdef estRobot
                 errX = outPose.x() - inPose.x();
                 errY = outPose.y() - inPose.y();
                 errTh = angleArith(inPose.th(), outPose.th(), -1);
-                if abs(errX) > 0.10 || abs(errY) > 0.10
-                    [left, right, ~] = estRobot.getEncData();
-                    obj = obj.updatePositionEnc(left, right);
-                    disp("big diff");
-                else
-                    obj.x = obj.x - obj.k * errX;
-                    obj.y = obj.y - obj.k * errY;
-                    obj.th = obj.th - obj.k * errTh;
-                end
+                if errX > 0.07 || errY > 0.07
+                    ob
+                obj.x = obj.x - obj.k * errX;
+                obj.y = obj.y - obj.k * errY;
+                obj.th = obj.th - obj.k * errTh;
             else
                 [left, right, ~] = estRobot.getEncData();
                 obj = obj.updatePositionEnc(left, right); 
