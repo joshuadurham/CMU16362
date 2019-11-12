@@ -183,12 +183,12 @@ classdef mrplSystem
             obj.estRobot = obj.estRobot.updatePositionLidar(rangeIm);
         end
         
-        function obj = updateStateEstFusion(obj, lineMapLocalizer)
+        function obj = updateStateEstFusion(obj)
             [left, right, ~] = obj.estRobot.getEncData();
-            obj.estRobot = obj.estRobot.updatePosition(left, right);
+            obj.estRobot = obj.estRobot.updatePositionEnc(left, right);
             [lscan, samescan] = obj.estRobot.getLaserData();
             if ~samescan
-                obj.estRobot = obj.estRobot.updatePositionFusion(lineMapLocalizer, lscan);
+                obj.estRobot = obj.estRobot.updatePositionFusion(lscan);
             end
         end
         
@@ -403,7 +403,7 @@ classdef mrplSystem
             robot = raspbot('RaspBot-11');
             laserscan = zeros(1, 360);
             samescan = true;
-            
+            disp("laser");
             robot.startLaser();
             robot.encoders.NewMessageFcn=@encoderEventListener;
             robot.laser.NewMessageFcn=@laserEventListener;
@@ -413,7 +413,7 @@ classdef mrplSystem
             initRightEncoder = currRightEncoder;
             initTime = timestamp;
             
-            % set baseline for state estimator
+            %set baseline for state estimator
             obj.estRobot.initLeftEncoder = initLeftEncoder;
             obj.estRobot.initRightEncoder = initRightEncoder;
             obj.estRobot.lastTime = initTime;
@@ -444,9 +444,9 @@ classdef mrplSystem
             pause(5);
             
             robot.sendVelocity(0, 0);
-            
+            disp("check");
             i = 2;
-            while i < size(obj.endpoints, 1)
+            while i <= size(obj.endpoints, 1)
                 [xf, yf, thf] = obj.getEndpointToRobotOriginPoint(i);
                 obj = obj.runRobot(tau, largeMotionFeedBack, [xf, yf, thf], false, false, 1);
                 pause(4);
