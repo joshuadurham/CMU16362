@@ -180,8 +180,11 @@ classdef mrplSystem
         function obj = updateStateEstLidar(obj)
             [lscan, samescan] = obj.estRobot.getLaserData();
             if ~samescan
-                filteredScan = rangeImage.filterLaserData(lscan);
-                obj.estRobot = obj.estRobot.updatePositionLidar(filteredScan);
+                rangeIm = rangeImage(lscan, 10, true);
+                filteredPoints = [rangeIm.xArray;
+                                         rangeIm.yArray;
+                                         ones(1, size(rangeIm.xArray, 2))];
+                obj.estRobot = obj.estRobot.updatePositionLidar(filteredPoints);
             end
         end
         
@@ -189,10 +192,13 @@ classdef mrplSystem
             [left, right, ~] = obj.estRobot.getEncData();
             obj.estRobot = obj.estRobot.updatePositionEnc(left, right);
             [lscan, samescan] = obj.estRobot.getLaserData();
-            if ~samescan
-                filteredScan = rangeImage.filterLaserData(lscan);
-                obj.estRobot = obj.estRobot.updatePositionFusion(filteredScan);
-            end
+             if ~samescan
+                rangeIm = rangeImage(lscan, 10, true);
+                filteredPoints = [rangeIm.xArray;
+                                         rangeIm.yArray;
+                                         ones(1, size(rangeIm.xArray, 2))];
+                obj.estRobot = obj.estRobot.updatePositionFusion(filteredPoints);
+             end
         end
         
         function plotData(obj)
@@ -345,7 +351,7 @@ classdef mrplSystem
                 % update our state estimation; if no feedback (small
                 % motion) only update with odometry, otherwise use fusion
 %                 if ~feedBack
-                obj = obj.updateStateEstEnc();
+                obj = obj.updateStateEstFusion();
 %                 else
 %                     obj = obj.updateStateEstFusion();
 %                 end
@@ -428,7 +434,7 @@ classdef mrplSystem
             ylabel('y (meters)');
 
             positionIdx = 1;
-            tau = 5.25;
+            tau = 3;
             largeMotionFeedBack = true;
             smallMotionFeedBack = false;
 
@@ -450,12 +456,12 @@ classdef mrplSystem
             disp("check");
             i = 2;
             while i <= size(obj.endpoints, 1)
-                % obj = obj.updateStateEstLidar();
+                obj = obj.updateStateEstLidar();
                 [xf, yf, thf] = obj.getEndpointToRobotOriginPoint(i);
 %                 if i == 3
 %                     obj = obj.runRobot(tau, smallMotionFeedBack, [xf, yf, thf], false, false, 1);
 %                 else
-                    obj = obj.runRobot(tau, largeMotionFeedBack, [xf, yf, thf], false ,false, 1);
+                obj = obj.runRobot(tau, largeMotionFeedBack, [xf, yf, thf], false ,false, 1);
                 i = i + 1;
                 pause(2);
             end

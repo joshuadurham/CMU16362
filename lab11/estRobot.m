@@ -5,7 +5,7 @@ classdef estRobot
     % loop
     
     properties(Constant)
-        k = 0.125;
+        k = 0.25;
     end
     
     properties
