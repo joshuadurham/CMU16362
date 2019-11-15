@@ -125,8 +125,6 @@ classdef lineMapLocalizer < handle
                     outPose = currPose;
                     success = 1;
                     break;
-                elseif (curr_error > prevError)
-                    break;
                 end
                 outPose = currPose;
                 prevError = curr_error;

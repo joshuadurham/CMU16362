@@ -44,7 +44,7 @@ classdef mrplSystem
                   0, 1.219];
             % points of the walls wrt to the world
             gain = 0.3;
-            errThresh = 0.01;
+            errThresh = 0.015;
             gradThresh = 0.0005;
             lineMapLoc = lineMapLocalizer(l1, l2, gain, errThresh, gradThresh);
         end
@@ -177,16 +177,21 @@ classdef mrplSystem
             obj.estRobot = obj.estRobot.updatePositionEnc(left, right);
         end
         
-        function obj = updateStateEstLidar(obj, rangeIm)
-            obj.estRobot = obj.estRobot.updatePositionLidar(rangeIm);
+        function obj = updateStateEstLidar(obj)
+            [lscan, samescan] = obj.estRobot.getLaserData();
+            if ~samescan
+                filteredScan = rangeImage.filterLaserData(lscan);
+                obj.estRobot = obj.estRobot.updatePositionLidar(filteredScan);
+            end
         end
         
-        function obj = updateStateEstFusion(obj, lineMapLocalizer)
+        function obj = updateStateEstFusion(obj)
             [left, right, ~] = obj.estRobot.getEncData();
             obj.estRobot = obj.estRobot.updatePositionEnc(left, right);
             [lscan, samescan] = obj.estRobot.getLaserData();
             if ~samescan
-                obj.estRobot = obj.estRobot.updatePositionFusion(lineMapLocalizer, lscan);
+                filteredScan = rangeImage.filterLaserData(lscan);
+                obj.estRobot = obj.estRobot.updatePositionFusion(filteredScan);
             end
         end
         
@@ -339,11 +344,11 @@ classdef mrplSystem
 
                 % update our state estimation; if no feedback (small
                 % motion) only update with odometry, otherwise use fusion
-                if ~feedBack
-                    obj = obj.updateStateEstEnc();
-                else
-                    obj = obj.updateStateEstFusion();
-                end
+%                 if ~feedBack
+                obj = obj.updateStateEstEnc();
+%                 else
+%                     obj = obj.updateStateEstFusion();
+%                 end
 
                 % clock time
                 currT = toc(startTic);
@@ -401,17 +406,17 @@ classdef mrplSystem
             robot = raspbot('RaspBot-11');
             laserscan = zeros(1, 360);
             samescan = true;
-            
+            disp("laser");
             robot.startLaser();
             robot.encoders.NewMessageFcn=@encoderEventListener;
-            robot.laser.NewMessageFcn=@laserEventListener;
+            % robot.laser.NewMessageFcn=@laserEventListener;
             
             % get the current ENC values
             initLeftEncoder = currLeftEncoder;
             initRightEncoder = currRightEncoder;
             initTime = timestamp;
             
-            % set baseline for state estimator
+            %set baseline for state estimator
             obj.estRobot.initLeftEncoder = initLeftEncoder;
             obj.estRobot.initRightEncoder = initRightEncoder;
             obj.estRobot.lastTime = initTime;
@@ -423,7 +428,7 @@ classdef mrplSystem
             ylabel('y (meters)');
 
             positionIdx = 1;
-            tau = 5;
+            tau = 5.25;
             largeMotionFeedBack = true;
             smallMotionFeedBack = false;
 
@@ -436,18 +441,23 @@ classdef mrplSystem
                 pause(0.05);
             end
             
-            obj = obj.updateStateEstFusion();
             initPose = pose(0.6096,0.6096,pi()/2.0);
             obj.estRobot = obj.estRobot.setPose(initPose);
             pause(5);
+            % obj = obj.updateStateEstLidar();
             
             robot.sendVelocity(0, 0);
-            
+            disp("check");
             i = 2;
-            while i < size(obj.endpoints, 1)
+            while i <= size(obj.endpoints, 1)
+                % obj = obj.updateStateEstLidar();
                 [xf, yf, thf] = obj.getEndpointToRobotOriginPoint(i);
-                obj = obj.runRobot(tau, largeMotionFeedBack, [xf, yf, thf], false, false, 1);
-                pause(4);
+%                 if i == 3
+%                     obj = obj.runRobot(tau, smallMotionFeedBack, [xf, yf, thf], false, false, 1);
+%                 else
+                    obj = obj.runRobot(tau, largeMotionFeedBack, [xf, yf, thf], false ,false, 1);
+                i = i + 1;
+                pause(2);
             end
             
             robot.stopLaser();

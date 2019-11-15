@@ -5,7 +5,7 @@ classdef estRobot
     % loop
     
     properties(Constant)
-        k = 0.25;
+        k = 0.125;
     end
     
     properties
@@ -107,13 +107,18 @@ classdef estRobot
                 errX = outPose.x() - inPose.x();
                 errY = outPose.y() - inPose.y();
                 errTh = angleArith(inPose.th(), outPose.th(), -1);
-                obj.x = obj.x - obj.k * errX;
-                obj.y = obj.y - obj.k * errY;
-                obj.th = obj.th - obj.k * errTh;
+                if abs(errX) > 0.10 || abs(errY) > 0.10
+                    [left, right, ~] = estRobot.getEncData();
+                    obj = obj.updatePositionEnc(left, right);
+                    disp("big diff");
+                else
+                    obj.x = obj.x - obj.k * errX;
+                    obj.y = obj.y - obj.k * errY;
+                    obj.th = obj.th - obj.k * errTh;
+                end
             else
-                obj.x = inPose.x();
-                obj.y = inPose.y();
-                obj.th = inPose.th();
+                [left, right, ~] = estRobot.getEncData();
+                obj = obj.updatePositionEnc(left, right); 
                 disp("No scan match");
             end
         end

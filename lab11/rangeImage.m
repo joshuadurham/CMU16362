@@ -2,7 +2,7 @@ classdef rangeImage < handle
     %rangeImage Stores a 1D range image and provides related services.
     
     properties(Constant)
-        maxUsefulRange = 1.25;
+        maxUsefulRange = 1.15;
         minUsefulRange = 0.08;
         maxRangeForTarget = 1.0;
         % [x, y, w, h]
@@ -67,7 +67,15 @@ classdef rangeImage < handle
                 y = 0;
             end
         end
-                
+        
+        function filteredIm = filterLaserData(rangeIm)
+            if size(rangeIm, 2) < 50
+                filteredIm = rangeIm;
+            else
+                filteredIm = rangeIm(1:10:size(rangeIm, 2));
+            end
+        end
+            
     end
             
     
