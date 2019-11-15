@@ -13,7 +13,7 @@ classdef mrplSystem
         % pose of acquisition position to goal
         % pose of the final position wrt to the acquisition position
         Pfp = pose(-0.05, 0, 0);
-        % might need to be negative
+        % might need to be negativefv
         Psr = pose(0, 0, -0.08);
         % 0.0337 specifically for Robit 16
         maxLen = 0.14; % test for now
@@ -46,7 +46,6 @@ classdef mrplSystem
             gain = 0.3;
             errThresh = 0.01;
             gradThresh = 0.0005;
-            
             lineMapLoc = lineMapLocalizer(l1, l2, gain, errThresh, gradThresh);
         end
     end
@@ -89,7 +88,6 @@ classdef mrplSystem
         end
         
         function Two = getWorldToOriginT(obj)
-            % use for this lab, pass in origin posefor 
             % transform of world wrt robot origin
             [ox, oy, oth] = obj.estRobot.getRobotPose();
             originPose = pose(ox, oy, oth);
@@ -185,7 +183,7 @@ classdef mrplSystem
         
         function obj = updateStateEstFusion(obj, lineMapLocalizer)
             [left, right, ~] = obj.estRobot.getEncData();
-            obj.estRobot = obj.estRobot.updatePosition(left, right);
+            obj.estRobot = obj.estRobot.updatePositionEnc(left, right);
             [lscan, samescan] = obj.estRobot.getLaserData();
             if ~samescan
                 obj.estRobot = obj.estRobot.updatePositionFusion(lineMapLocalizer, lscan);
