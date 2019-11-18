@@ -8,7 +8,7 @@ classdef rangeImage < handle
         % [x, y, w, h]
         %boundingRect = [0.0, 0.1, 0.20, -0.2];
         edgeWeights = 10;
-        wallThresh = 1.5;
+        wallThresh = 0.5; %1.5 originally
         % [0.2, 0.3, 0.6, -0.6]
         boundingRect = [0.15, 0.35, 0.6, -0.6];
     end
@@ -285,10 +285,19 @@ classdef rangeImage < handle
                         boundingLen < (1 - lengthDiffThresh) * maxLen || ...
                         sqrt(testLambda(1)^2 - lambda(1)^2) < obj.wallThresh)
                     disp("FAILING ERRORS BELOW");
+                    disp("lambda1")
                     disp(lambda(1));
+                    disp("boundingLen");
                     disp(boundingLen);
+                    disp("testLambda1");
                     disp(testLambda(1));
+                    disp("candidateIdx");
                     disp(candidateIdx);
+                    disp(candidateIdx < numPtsThresh);
+                    disp(lambda(1) >= eigThresh);
+                    disp(boundingLen > (1 + lengthDiffThresh) * maxLen);
+                    disp(boundingLen < (1 - lengthDiffThresh) * maxLen);
+                    disp(sqrt(testLambda(1)^2 - lambda(1)^2) < obj.wallThresh);
                     xPos = 0;
                     yPos = 0;
                     err = 100000000;

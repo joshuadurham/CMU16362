@@ -16,7 +16,7 @@ classdef mrplSystem
         % might need to be negativefv
         Psr = pose(0, 0, -0.08);
         % 0.0337 specifically for Robit 16
-        maxLen = 0.14; % test for now
+        maxLen = 0.125; % test for now
         arrLen = 2000;
         amax = 0.1;
     end
@@ -460,16 +460,16 @@ classdef mrplSystem
                     % -1, -1, -1 encodes spin to 3pi/2
                     % I assume that we want to keep things at the same
                     % (x,y) coord
-                    thf = 3.0*pi()/2.0;
+                    thf = pi();
                     [ox, oy, ~] = obj.estRobot.getRobotPose();
-                    obj = obj.runRobot(tau, feedBack, [0, 0, thf], true, false, 1);
+                    obj = obj.runRobot(tau, smallMotionFeedBack, [0, 0, thf], true, false, 1);
                 elseif obj.endpoints(i,1) == 1 && obj.endpoints(i,2) == 1 && obj.endpoints(i,3) == 1
                     % 1, 1, 1 encodes spin to pi/2
                     % I assume that we want to keep things at the same
                     % (x,y) coord
-                    thf = pi()/2.0;
+                    thf = pi();
                     [ox, oy, ~] = obj.estRobot.getRobotPose();
-                    obj = obj.runRobot(tau, feedBack, [0, 0, thf], true, false, 1);
+                    obj = obj.runRobot(tau, smallMotionFeedBack, [0, 0, thf], true, false, 1);
                 elseif obj.endpoints(i,1) == 2 && obj.endpoints(i,2) == 2 && obj.endpoints(i,3) == 2
                     % 2, 2, 2 encodes drop off pallet
                     robot.forksDown();
@@ -477,15 +477,22 @@ classdef mrplSystem
                     % back up 5 cm by driving upward
                     xf = 0.05;
                     [ox, oy, oth] = obj.estRobot.getRobotPose();
-                    obj = obj.runRobot(tau, feedBack, [xf, 0, 0], false, true, -1);
+                    obj = obj.runRobot(tau, smallMotionFeedBack, [xf, 0, 0], false, true, -1);
                 elseif obj.endpoints(i,1) == 3 && obj.endpoints(i,2) == 3 && obj.endpoints(i,3) == 3
                     % 3, 3, 3 encodes use laser to pick up pallet
                     % TODO: Probably have to transform xf, yf, thf into
                     % global frame
                     robot.forksDown();
                     laserData = robot.laser.LatestMessage.Ranges;
+                    display(laserData);
                     sailFinder = rangeImage(laserData, 1, true);
                     [xf, yf, thf] = obj.findSail(sailFinder);
+                    display(xf);
+                    display(yf);
+                    display(thf);
+                    if (xf == 10000)
+                        continue;
+                    end
                     Pgr = pose(xf, yf, thf);
                     % transform of pallet to robot 
                     Tpr = Pgr.bToA / obj.Tgp;
@@ -497,8 +504,11 @@ classdef mrplSystem
                     xf = Pfr(1);
                     yf = Pfr(2);
                     thf = Pfr(3);
-                    obj = obj.runRobot(tau, feedBack, [xf, yf, thf], false, false, 1);
-                    pause(1);
+                    obj = obj.runRobot(tau, largeMotionFeedBack, [xf, yf, thf], false, false, 1);
+                    pause(0.5);
+                    xf = 0.025;
+                    obj = obj.runRobot(tau, smallMotionFeedBack, [xf, 0, 0], false, true, 1);
+                    pause(0.5);
                     robot.forksUp();
                     pause(1);
                 else
