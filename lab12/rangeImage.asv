@@ -10,7 +10,7 @@ classdef rangeImage < handle
         edgeWeights = 10;
         wallThresh = 0.5; %1.5 originally
         % [0.2, 0.3, 0.6, -0.6]
-        boundingRect = [0.15, 0.15, 0.60, -0.3];
+        boundingRect = [0.15, 0., 0.6, -0.6];
     end
     
     properties(Access = public)

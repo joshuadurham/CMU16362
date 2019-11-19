@@ -9,10 +9,10 @@ classdef mrplSystem
         wheelbase = 0.09;
         Vref = 0.2;
         % pose of goal to pallet
-        Pgp = pose(-0.25, 0, 0);
+        Pgp = pose(-0.125, 0, 0);
         % pose of acquisition position to goal
         % pose of the final position wrt to the acquisition position
-        Pfp = pose(-0.05, 0, 0);
+        Pfp = pose(-0.1, 0, 0);
         % might need to be negativefv
         Psr = pose(0, 0, -0.08);
         % 0.0337 specifically for Robit 16
@@ -506,7 +506,7 @@ classdef mrplSystem
                     thf = Pfr(3);
                     obj = obj.runRobot(tau, largeMotionFeedBack, [xf, yf, thf], false, false, 1);
                     pause(0.5);
-                    xf = 0.025;
+                    xf = 0.04;
                     obj = obj.runRobot(tau, smallMotionFeedBack, [xf, 0, 0], false, true, 1);
                     pause(0.5);
                     robot.forksUp();
