@@ -1,0 +1,137 @@
+classdef lineMapLocalizer < handle
+    %mapLocalizer A class to match a range scan against a map in
+    % order to find the true location of the range scan relative to
+    % the map.
+    
+    properties(Constant)
+        maxErr = 0.12; % 12cm
+        minPts = 5; % min # of points that must match
+        
+        maxIter = 40;
+        ptFrac = 1;
+    end
+    
+    properties(Access = private)
+        
+    end
+    
+    properties(Access = public)
+        lines_p1 = [];
+        lines_p2 = [];
+        gain = 0.3;
+        errThresh = 0.01;
+        gradThresh = 0.0005;
+    end
+    
+    methods
+        function obj = lineMapLocalizer(lines_p1, lines_p2, gain, errThresh, gradThresh)
+            obj.lines_p1 = lines_p1;
+            obj.lines_p2 = lines_p2;
+            obj.gain = gain;
+            obj.errThresh = errThresh;
+            obj.gradThresh = gradThresh;
+        end
+
+        function ro2 = closestSquaredDistanceToLines(obj, pi)
+            % Find the squared shortest distance from pi to any line
+            % segment in the supplied list of line segments.
+            % pi is an array of 2d points
+            % throw away homogenous flag
+            pi = pi(1:2,:);
+            r2Array = zeros(size(obj.lines_p1,2),size(pi,2));
+            for i = 1:size(obj.lines_p1,2)
+                [r2Array(i,:) , ~] = closestPointOnLineSegment(pi,...
+                obj.lines_p1(:,i),obj.lines_p2(:,i));
+            end
+            ro2 = min(r2Array,[],1);
+        end
+        
+        function ids = throwOutliers(obj, pose, ptsInModelFrame)
+            % Find ids of outliers in a scan.
+            worldPts = pose.bToA()*ptsInModelFrame;
+            r2 = obj.closestSquaredDistanceToLines(worldPts);
+            ids = find(r2 <= obj.maxErr*obj.maxErr);
+        end
+        
+        function avgErr2 = fitError(obj,pose,ptsInModelFrame)
+            % Find the variance of perpendicular distances of
+            % all points to all lines
+            % transform the points
+            worldPts = pose.bToA()*ptsInModelFrame;
+
+            r2 = obj.closestSquaredDistanceToLines(worldPts);
+            r2(r2 == Inf) = [];
+            err2 = sum(r2);
+            num = length(r2);
+            if(num >= lineMapLocalizer.minPts)
+                avgErr2 = err2/num;
+            else
+                % not enough points to make a guess
+                avgErr2 = inf;
+            end
+        end
+        
+        function [curr_error, J] = getJacobian(obj,poseIn,modelPts)
+            % Computes the gradient of the error function
+
+            curr_error = fitError(obj,poseIn,modelPts);
+
+            eps = 1e-9;
+            dx = [eps ; 0.0 ; 0.0];
+            dx_error = obj.fitError(pose(poseIn.getPoseVec() + dx), modelPts);
+            dEdx = (dx_error - curr_error)/eps;
+            
+            dy = [0.0; eps; 0.0];
+            dy_error = obj.fitError(pose(poseIn.getPoseVec() + dy), modelPts);
+            dEdy = (dy_error - curr_error)/eps;
+            
+            dTh = [0.0; 0.0; eps];
+            dth_error = obj.fitError(pose(poseIn.getPoseVec() + dTh), modelPts);
+            dEdth = (dth_error - curr_error)/eps;
+            
+            J = [dEdx, dEdy, dEdth];
+        end
+        
+        function [success, outPose, ids] = refinePose(obj, inPose, ptsInModelFrame, maxIters)
+            % Let's cut down the number of points we process, or else it
+            % runs way too slow to be used efficiently
+            xVec = ptsInModelFrame(1, 1:obj.ptFrac:end);
+            yVec = ptsInModelFrame(2, 1:obj.ptFrac:end);
+            ptsInModelFrame = [xVec; yVec; ones(size(xVec))];
+            
+            success = 0;
+            xVec = [];
+            yVec = [];
+            currPose = inPose.getPoseVec();
+            outPose = currPose;
+            
+            ids = obj.throwOutliers(inPose, ptsInModelFrame);
+            ptsInModelFrame = ptsInModelFrame(:, ids);
+%             obj.last_ptsAnalyzed = ptsInModelFrame;
+            [curr_error, J] = obj.getJacobian(pose(currPose), ptsInModelFrame);
+            prevError = 1000000;
+            prevJMag = 10000000;
+            
+            iter = 1;
+            while iter <= maxIters
+                currPose = currPose - obj.gain * J';
+                xVec = [xVec currPose(1)];
+                yVec = [yVec currPose(2)];
+                
+                sumJSquaredVals = dot(J, J);
+                JMag = sqrt(sumJSquaredVals);
+                [curr_error, J] = obj.getJacobian(pose(currPose), ptsInModelFrame);
+                if (curr_error < obj.errThresh || JMag < obj.gradThresh)
+                    outPose = currPose;
+                    success = 1;
+                    break;
+                end
+                outPose = currPose;
+                prevError = curr_error;
+                prevJMag = JMag;
+                iter = iter + 1;
+            end
+            outPose = pose(outPose);
+        end
+    end
+end

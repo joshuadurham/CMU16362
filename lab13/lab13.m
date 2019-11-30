@@ -1,0 +1,56 @@
+% -1, -1, -1 encodes spin to 3pi/2,
+% 1, 1, 1 encodes spin to pi/2
+% 2, 2, 2 encodes drop off pallet
+% 3, 3, 3 encodes use laser to pick up pallet
+
+%% palletPoints: points where we pick up target pallets
+%% dropPoints: Where we drop the pallets off
+% We go through these arrays of points in order,
+% so if you want the robot to go to points in a different order
+% just shuffle the list around
+palletPoints = [
+    12*0.0254, 72*0.0254, pi()/2.0;
+    24*0.0254, 72*0.0254, pi()/2.0;
+    36*0.0254, 72*0.0254, pi()/2.0;
+    48*0.0254, 72*0.0254, pi()/2.0;
+    60*0.0254, 72*0.0254, pi()/2.0;
+    72*0.0254, 72*0.0254, pi()/2.0;
+    84*0.0254, 72*0.0254, pi()/2.0;
+    84*0.0254, 48*0.0254, 0;
+    84*0.0254, 36*0.0254, 0;
+    84*0.0254, 24*0.0254, 0;
+];
+dropPoints = [
+    18*0.0254, 12*0.0254, 3*pi()/2.0;
+    27*0.0254, 12*0.0254, 3*pi()/2.0;
+    36*0.0254, 12*0.0254, 3*pi()/2.0;
+    45*0.0254, 12*0.0254, 3*pi()/2.0;
+    54*0.0254, 12*0.0254, 3*pi()/2.0;
+    63*0.0254, 12*0.0254, 3*pi()/2.0;
+    72*0.0254, 12*0.0254, 3*pi()/2.0;
+];
+% endpoints = [0,      0,      0;
+%              1,      1,      1;
+%              12*0.0254, 24*0.0254, pi()/2.0;
+%              3,      3,      3;
+%              -1,     -1,     -1;
+%              21*0.0254, 9*0.0254, 3*pi()/2.0;
+%              2,      2,      2; 
+%              
+%              1,      1,      1;
+%              24*0.0254, 24*0.0254, pi()/2.0;
+%              3,      3,      3;
+%              -1,     -1,     -1;
+%              30*0.0254, 9*0.0254, 3*pi()/2.0;
+%              2,      2,      2;  
+%              
+%              1,      1,      1;
+%              36*0.0254, 24*0.0254, pi()/2.0;
+%              3,      3,      3;
+%              -1,     -1,     -1;
+%              39*0.0254, 9*0.0254, 3*pi()/2.0;
+%              2,      2,      2;
+%              ];
+
+mrpl = mrplSystem(palletPoints, dropPoints);
+mrpl.executeTrajectory();
