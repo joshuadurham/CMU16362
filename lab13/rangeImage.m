@@ -4,6 +4,7 @@ classdef rangeImage < handle
     properties(Constant)
         maxUsefulRange = 1.15;
         minUsefulRange = 0.08;
+        palletRange = 0.1;
         maxRangeForTarget = 1.0;
         % [x, y, w, h]
         %boundingRect = [0.0, 0.1, 0.20, -0.2];
@@ -80,7 +81,7 @@ classdef rangeImage < handle
             
     
     methods(Access = public)
-        function obj = rangeImage(ranges, skip, cleanFlag)
+        function obj = rangeImage(ranges, skip, cleanFlag, checkCarry)
             % Constructs a rangeImage for the supplied data.
             % Converts the data to rectangular coordinates
             % should be in robot coordinates
@@ -95,6 +96,7 @@ classdef rangeImage < handle
                 end
                 obj.numPix = n;
                 if cleanFlag; obj.removeBadPoints(); end;
+                if checkCarry; obj.onlyCloseInFront(); end;
             end
         end
         
@@ -111,6 +113,39 @@ classdef rangeImage < handle
             numGood = 0;
             for i=1:length(obj.rArray)
                 if obj.rArray(i) <= obj.maxUsefulRange && obj.rArray(i) >= obj.minUsefulRange
+                    numGood = numGood + 1;
+                    goodR(numGood) = obj.rArray(i);
+                    goodT(numGood) = obj.tArray(i);
+                    goodX(numGood) = obj.xArray(i);
+                    goodY(numGood) = obj.yArray(i);
+                end
+            end
+            if numGood == 0
+                obj.rArray = [];
+                obj.tArray = [];
+                obj.xArray = [];
+                obj.yArray = [];
+            else
+                obj.rArray = goodR(1:numGood);
+                obj.tArray = goodT(1:numGood);
+                obj.xArray = goodX(1:numGood);
+                obj.yArray = goodY(1:numGood);
+            end
+        end
+        
+        function onlyCloseInFront(obj)
+            % takes all points above and below two convenient range
+            % thresholds out of the arrays.  This is a convenience but the
+            % result should not be used by any routine that expects the
+            % points to be equally separated in angle. The operation is
+            % done inline and removed data is deleted.
+            goodR = zeros(1, size(obj.rArray, 2));
+            goodT = zeros(1, size(obj.tArray, 2));
+            goodX = zeros(1, size(obj.xArray, 2));
+            goodY = zeros(1, size(obj.yArray, 2));
+            numGood = 0;
+            for i=1:length(obj.rArray)
+                if obj.rArray(i) <= obj.palletRange && (obj.tArray(i) <= pi() / 3 || obj.tArray(i) >= 5 * pi() / 3)
                     numGood = numGood + 1;
                     goodR(numGood) = obj.rArray(i);
                     goodT(numGood) = obj.tArray(i);

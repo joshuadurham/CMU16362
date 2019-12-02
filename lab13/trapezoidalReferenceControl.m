@@ -114,6 +114,9 @@ classdef trapezoidalReferenceControl
         
         function V = getVAtTime(obj, t)
             V = interp1(obj.tArr, obj.velArr, t);
+            if isnan(V)
+                V = 0;
+            end
         end
               
         function pose = getPoseAtTime(obj, t)

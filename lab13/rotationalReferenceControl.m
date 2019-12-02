@@ -135,6 +135,9 @@ classdef rotationalReferenceControl
               
         function w = getwAtTime(obj, t)
             w = interp1(obj.tArr, obj.wArr, t);
+            if isnan(w)
+                w = 0;
+            end
         end
 
         function duration = getTrajectoryDuration(obj)
