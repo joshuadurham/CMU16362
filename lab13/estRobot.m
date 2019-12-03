@@ -84,7 +84,7 @@ classdef estRobot
         end
         
         function obj = updatePositionLidar(obj, rangeIm)
-            % state est based solely on laserscan data
+            % state est based solely on laserscan data    
             inPose = pose(obj.x, obj.y, obj.th);
             [succ, outPose, ids] = obj.lineMapLoc.refinePose(inPose, rangeIm, 50);
             if succ

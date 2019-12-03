@@ -32,15 +32,15 @@ classdef lineMapLocalizer < handle
             obj.gradThresh = gradThresh;
         end
 
-        function ro2 = closestSquaredDistanceToLines(obj, pi)
+        function ro2 = closestSquaredDistanceToLines(obj, pl)
             % Find the squared shortest distance from pi to any line
             % segment in the supplied list of line segments.
             % pi is an array of 2d points
             % throw away homogenous flag
-            pi = pi(1:2,:);
-            r2Array = zeros(size(obj.lines_p1,2),size(pi,2));
+            pl = pl(1:2,:);
+            r2Array = zeros(size(obj.lines_p1,2),size(pl,2));
             for i = 1:size(obj.lines_p1,2)
-                [r2Array(i,:) , ~] = closestPointOnLineSegment(pi,...
+                [r2Array(i,:) , ~] = closestPointOnLineSegment(pl,...
                 obj.lines_p1(:,i),obj.lines_p2(:,i));
             end
             ro2 = min(r2Array,[],1);

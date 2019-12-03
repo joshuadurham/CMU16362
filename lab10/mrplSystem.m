@@ -141,6 +141,8 @@ classdef mrplSystem
         end
         
         function obj = updateStateEstLidar(obj, lineMapLocalizer, rangeIm)
+            rangeHomo = [rangeIm.xArray;
+                        
             obj.estRobot = obj.estRobot.updatePositionLidar(lineMapLocalizer, rangeIm);
         end 
         

@@ -46,10 +46,10 @@ classdef mrplSystem
         function lineMapLoc = makeLocalizer()
             l1 = [0.05, 0; 
                   0, 0.05;
-                  2.438, 0.05];
+                  2.438, 0.05]';
             l2 = [2.388, 0;
                   0, 3.6576;
-                  2.438, 3.6576];
+                  2.438, 3.6576]';
             % points of the walls wrt to the world
             gain = 0.3;
             errThresh = 0.015;
@@ -188,27 +188,24 @@ classdef mrplSystem
         end
         
         function obj = updateStateEstLidar(obj)
-            [lscan, samescan] = obj.estRobot.getLaserData();
-            if ~samescan
-                rangeIm = rangeImage(lscan, 10, true, false);
-                filteredPoints = [rangeIm.xArray;
-                                         rangeIm.yArray;
-                                         ones(1, size(rangeIm.xArray, 2))];
-                obj.estRobot = obj.estRobot.updatePositionLidar(filteredPoints);
-            end
+            global robot;
+            lscan = robot.laser.LatestMessage.Ranges;
+            rangeIm = rangeImage(lscan, 10, true, false);
+            filteredPoints = [rangeIm.xArray;
+                              rangeIm.yArray;
+                              ones(1, size(rangeIm.xArray, 2))];
+            obj.estRobot = obj.estRobot.updatePositionLidar(filteredPoints);
         end
         
         function obj = updateStateEstFusion(obj)
             [left, right, ~] = obj.estRobot.getEncData();
             obj.estRobot = obj.estRobot.updatePositionEnc(left, right);
-            [lscan, samescan] = obj.estRobot.getLaserData();
-             if ~samescan
-                rangeIm = rangeImage(lscan, 10, true, false);
-                filteredPoints = [rangeIm.xArray;
-                                         rangeIm.yArray;
-                                         ones(1, size(rangeIm.xArray, 2))];
-                obj.estRobot = obj.estRobot.updatePositionFusion(filteredPoints);
-             end
+            [lscan, ~] = obj.estRobot.getLaserData(); %robot.laser.LatestMessage.Ranges;
+            rangeIm = rangeImage(lscan, 10, true, false);
+            filteredPoints = [rangeIm.xArray;
+                              rangeIm.yArray;
+                              ones(1, size(rangeIm.xArray, 2))];
+            obj.estRobot = obj.estRobot.updatePositionFusion(filteredPoints);
         end
         
         function plotData(obj)
@@ -225,15 +222,15 @@ classdef mrplSystem
         % checks to see if you are currently carrying a pallet
         % if doesn't work, run a line detection instead
         function carrying = carryingPallet(obj)
-            [lscan, ~] = obj.estRobot.getLaserData();
-            sailFinder = rangeImage(lscan, 1, false, true);
-            sailFinder.xArray
-            if size(sailFinder.rArray, 2) > 5
-                    carrying = true;
-            % if nothing was found, loop again
-            else
-                carrying = false;
-            end
+%             [lscan, ~] = obj.estRobot.getLaserData();
+%             sailFinder = rangeImage(lscan, 1, false, true);
+%             sailFinder.xArray
+%             if size(sailFinder.rArray, 2) > 5
+%                     carrying = true;
+%             % if nothing was found, loop again
+%             else
+%                 carrying = false;
+%             end
             % dirty fix
             carrying = true;
         end 
@@ -397,7 +394,7 @@ classdef mrplSystem
                 % update our state estimation; if no feedback (small
                 % motion) only update with odometry, otherwise use fusion
 %                 if ~feedBack
-                obj = obj.updateStateEstFusion();
+                obj = obj.updateStateEstEnc();
 %                 else
 %                     obj = obj.updateStateEstFusion();
 %                 end
@@ -461,7 +458,7 @@ classdef mrplSystem
             disp("laser");
             robot.startLaser();
             robot.encoders.NewMessageFcn=@encoderEventListener;
-            robot.laser.NewMessageFcn=@laserEventListener;
+            %robot.laser.NewMessageFcn=@laserEventListener;
             
             % get the current ENC values
             initLeftEncoder = currLeftEncoder;
@@ -480,7 +477,7 @@ classdef mrplSystem
             ylabel('y (meters)');
 
             positionIdx = 1;
-            tau = 3;
+            tau = 4;
             largeMotionFeedBack = true;
             smallMotionFeedBack = false;
 
@@ -499,7 +496,7 @@ classdef mrplSystem
             robot.sendVelocity(0, 0);
             disp("check");
             palletIdx = 1;
-            dropIdx = 0;
+            dropIdx = 1;
             while palletIdx <= size(obj.palletPoints,1) && dropIdx < size(obj.dropPoints, 1)
                 i = 2;
                 % endPoints(2:end,:) encodes the series of moves for picking up and
@@ -534,7 +531,7 @@ classdef mrplSystem
                             % we didn't get a pallet sad :(, let's go to
                             % the safe location and try again for the next
                             % pallet
-                            obj = obj.updateStateEstLidar();
+                            obj = obj.updateStateEstEnc();
                             [xf, yf, thf] = obj.getEndpointToRobotOriginPoint(1);
                             obj = obj.runRobot(tau, largeMotionFeedBack, [xf, yf, thf], false ,false, 1);
                             % set i to be big so the loop terminates
@@ -572,7 +569,7 @@ classdef mrplSystem
                         display(yf);
                         display(thf);
                         if (xf == 10000)
-                            continue;
+                            break;
                         end
                         Pgr = pose(xf, yf, thf);
                         % transform of pallet to robot 
@@ -593,7 +590,7 @@ classdef mrplSystem
                         robot.forksUp();
                         pause(1);
                     else
-                        obj = obj.updateStateEstLidar();
+                        obj = obj.updateStateEstEnc();
                         [xf, yf, thf] = obj.getEndpointToRobotOriginPoint(i);
                         obj = obj.runRobot(tau, largeMotionFeedBack, [xf, yf, thf], false ,false, 1);
                     end
