@@ -85,7 +85,7 @@ classdef rangeImage < handle
             % Constructs a rangeImage for the supplied data.
             % Converts the data to rectangular coordinates
             % should be in robot coordinates
-            if(nargin == 3)
+            if(nargin == 4)
                 n=0;
                 for i=1:skip:length(ranges)
                     n = n + 1;
@@ -145,7 +145,7 @@ classdef rangeImage < handle
             goodY = zeros(1, size(obj.yArray, 2));
             numGood = 0;
             for i=1:length(obj.rArray)
-                if obj.rArray(i) <= obj.palletRange && (obj.tArray(i) <= pi() / 3 || obj.tArray(i) >= 5 * pi() / 3)
+                if obj.rArray(i) >= obj.minUsefulRange && obj.xArray(i) <= obj.palletRange && (obj.tArray(i) <= pi() / 3 || obj.tArray(i) >= 5 * pi() / 3)
                     numGood = numGood + 1;
                     goodR(numGood) = obj.rArray(i);
                     goodT(numGood) = obj.tArray(i);

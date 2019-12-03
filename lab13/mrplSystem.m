@@ -225,24 +225,32 @@ classdef mrplSystem
         % checks to see if you are currently carrying a pallet
         % if doesn't work, run a line detection instead
         function carrying = carryingPallet(obj)
-            global laserscan;
-            sailFinder = rangeImage(laserscan, 1, false, true);
+            [lscan, ~] = obj.estRobot.getLaserData();
+            sailFinder = rangeImage(lscan, 1, false, true);
+            sailFinder.xArray
             if size(sailFinder.rArray, 2) > 5
                     carrying = true;
             % if nothing was found, loop again
             else
                 carrying = false;
             end
+            % dirty fix
+            carrying = true;
         end 
         
         % simple test to see if carrying a pallet or not
-        function testCarry(obj)
+        function obj = testCarrying(obj)
+            global robot
+            global laserscan
             robot = raspbot('RaspBot-MyBoy');
             robot.startLaser();
-            pause(1);
+            laserscan = zeros(1, 360);
+            robot.laser.NewMessageFcn=@laserEventListener;
+            pause(5);
             carry = obj.carryingPallet();
             disp(carry);
             robot.stopLaser();
+            robot.shutdown();
         end
         
         % sets up finding the position of the sail before driving into it
@@ -346,8 +354,8 @@ classdef mrplSystem
         end
         
         function [x, y, th] = getSailPosition(obj)                
-            global laserscan;
-            sailFinder = rangeImage(laserscan, 1, true, false);
+            [lscan, ~] = obj.estRobot.getLaserData();
+            sailFinder = rangeImage(lscan, 1, true, false);
             [x, y, th] = obj.findSail(sailFinder);
         end
                 
@@ -359,9 +367,12 @@ classdef mrplSystem
             yf = endPoint(2);
             thf = endPoint(3);
             
-            if (lin)
+            if (lin && sgn == -1)
                 load('smallMotions.mat', 'backup');
                 obj.spline = backup;
+            elseif (lin && sgn == 1)
+                load('smallMotions.mat', 'forward');
+                obj.spline = forward;
             elseif (ang)
                 load('smallMotions.mat', 'turnAround');
                 obj.spline = turnAround;
@@ -450,7 +461,7 @@ classdef mrplSystem
             disp("laser");
             robot.startLaser();
             robot.encoders.NewMessageFcn=@encoderEventListener;
-            % robot.laser.NewMessageFcn=@laserEventListener;
+            robot.laser.NewMessageFcn=@laserEventListener;
             
             % get the current ENC values
             initLeftEncoder = currLeftEncoder;
@@ -554,7 +565,7 @@ classdef mrplSystem
                         %% should fix that issue, if we really need to (hopefully we don't)
                         robot.forksDown();
                         laserData = robot.laser.LatestMessage.Ranges;
-                        display(laserData);
+                        % display(laserData);
                         sailFinder = rangeImage(laserData, 1, true, false);
                         [xf, yf, thf] = obj.findSail(sailFinder);
                         display(xf);

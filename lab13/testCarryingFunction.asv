@@ -1,0 +1,3 @@
+mrpl = mrplSystem();
+global robotrobot = raspbot('RaspBot-11');
+mrpl.runRobot(0.5, false, [0, 0, pi()], true, false, 1);

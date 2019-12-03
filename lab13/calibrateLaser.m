@@ -4,7 +4,7 @@ rb.startLaser();
 pause(5);
 laserData = rb.laser.LatestMessage.Ranges;
 
-sailFinder = rangeImage(laserData, 1, true);
+sailFinder = rangeImage(laserData, 1, false, false);
 clf;
 sailFinder.plotXvsY(2);
 rb.stopLaser();
